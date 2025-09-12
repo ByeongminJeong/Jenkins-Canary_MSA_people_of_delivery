@@ -63,19 +63,19 @@ pipeline {
 
                     switch(branchNameClean) {
                         case 'main':
-                            imageTag = "v$${env.BUILD_NUMBER}-$${env.GIT_COMMIT_SHORT}"
+                            imageTag = "v${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
                             deploymentStrategy = "production"
                             break
                         case 'cloud':
-                            imageTag = "canary-$${env.BUILD_NUMBER}-$${env.GIT_COMMIT_SHORT}"
+                            imageTag = "canary-${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
                             deploymentStrategy = "canary"
                             break
                         case 'dev':
-                            imageTag = "dev-$${env.BUILD_NUMBER}-$${env.GIT_COMMIT_SHORT}"
+                            imageTag = "dev-${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
                             deploymentStrategy = "development"
                             break
                         default:
-                            imageTag = "$${branchNameClean}-$${env.GIT_COMMIT_SHORT}"
+                            imageTag = "${branchNameClean}-${env.GIT_COMMIT_SHORT}"
                             deploymentStrategy = "feature"
                     }
 
