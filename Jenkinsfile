@@ -309,11 +309,11 @@ pipeline {
                             grep "image:" "$output_file" | head -2
                         }
 
-                        # 배포 전략별 처리 (수정된 경로: aws/canary-deployment/)
+                        # 배포 전략별 처리 (수정된 경로: aws/canary-deployment/services/)
                         case "${DEPLOYMENT_STRATEGY}" in
                             canary)
                                 echo "=== 카나리 배포 실행 ==="
-                                cd aws/canary-deployment/k8s/services
+                                cd aws/canary-deployment/services
 
                                 # 기존 Deployment가 있다면 삭제 (Rollout으로 교체)
                                 echo "기존 Deployment 확인 및 삭제..."
@@ -347,7 +347,7 @@ pipeline {
                                 ;;
                             production)
                                 echo "=== 프로덕션 배포 ==="
-                                cd aws/canary-deployment/k8s/services
+                                cd aws/canary-deployment/services
 
                                 # 프로덕션도 Rollouts 사용하여 안전한 배포
                                 mkdir -p /tmp/k8s
@@ -363,7 +363,7 @@ pipeline {
                                 ;;
                             development)
                                 echo "=== 개발환경 배포 ==="
-                                cd aws/canary-deployment/k8s/services
+                                cd aws/canary-deployment/services
                                 
                                 # 기본 서비스들 먼저 배포 (basic-services 활용)
                                 /usr/local/bin/kubectl apply -f basic-services/auth-service.yaml -n ${NAMESPACE}
