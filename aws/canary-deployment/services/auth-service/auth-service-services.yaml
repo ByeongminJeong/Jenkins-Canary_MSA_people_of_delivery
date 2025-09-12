@@ -7,12 +7,12 @@ metadata:
   namespace: app
   labels:
     app: auth
-    version: stable  # 이 라벨이 중요!
+    version: stable  # Argo Rollouts 검증용
 spec:
   selector:
     app: auth
     service: auth-service
-    version: stable
+    # version 제거! (Rollout selector와 일치)
   ports:
   - name: http
     port: 80
@@ -28,12 +28,12 @@ metadata:
   namespace: app
   labels:
     app: auth
-    version: canary  # 이 라벨이 중요!
+    version: canary  # Argo Rollouts 검증용
 spec:
   selector:
     app: auth
     service: auth-service
-    version: canary
+    # version 제거! (Rollout selector와 일치)
   ports:
   - name: http
     port: 80
@@ -49,12 +49,12 @@ metadata:
   namespace: app
   labels:
     app: auth
-    version: stable  # 이 라벨이 중요!
+    version: stable  # Argo Rollouts 검증용
 spec:
   selector:
     app: auth
     service: auth-service
-    version: stable
+    # version 제거! (Rollout selector와 일치)
   ports:
   - name: http
     port: 80
