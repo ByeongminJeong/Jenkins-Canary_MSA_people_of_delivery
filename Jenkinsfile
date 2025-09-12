@@ -17,65 +17,33 @@ pipeline {
         stage('Generate Tags') {
             steps {
                 script {
-                    // 브랜치명 정리 - cloud, main 전략에 맞게 수정
-                    def branchNameClean = sh(
-                        script: '''
-                            echo "DEBUG - BRANCH_NAME: ${BRANCH_NAME:-empty}" >&2
-                            echo "DEBUG - GIT_BRANCH: ${GIT_BRANCH:-empty}" >&2
-                            echo "DEBUG - CHANGE_BRANCH: ${CHANGE_BRANCH:-empty}" >&2
-
-                            if [ -n "${CHANGE_BRANCH:-}" ]; then
-                                CURRENT_BRANCH="${CHANGE_BRANCH}"
-                            elif [ -n "${GIT_BRANCH:-}" ]; then
-                                CURRENT_BRANCH="${GIT_BRANCH}"
-                            elif [ -n "${BRANCH_NAME:-}" ]; then
-                                CURRENT_BRANCH="${BRANCH_NAME}"
-                            else
-                                CURRENT_BRANCH=$$(git symbolic-ref --short HEAD 2>/dev/null || echo "detached-$$(git rev-parse --short HEAD)")
-                            fi
-
-                            # origin/ 프리픽스 제거 및 표준화
-                            CLEAN_BRANCH=$$(echo "$$CURRENT_BRANCH" | sed 's|^origin/||' | sed 's|^refs/heads/||')
-
-                            # 브랜치명 표준화 - cloud, main만 주로 사용
-                            case "$CLEAN_BRANCH" in
-                                main|master)
-                                    echo "main"
-                                    ;;
-                                cloud|cloud-deploy)
-                                    echo "cloud"
-                                    ;;
-                                dev|develop|development)
-                                    echo "dev"
-                                    ;;
-                                *)
-                                    # feature 브랜치는 cloud 기반으로 처리
-                                    echo "feature-$$(echo $$CLEAN_BRANCH | sed 's/[^a-zA-Z0-9]/-/g')"
-                                    ;;
-                            esac
-                        ''',
-                        returnStdout: true
-                    ).trim()
-
-                    // 이미지 태그 생성 전략 개선
+                    // 현재 브랜치 확인 (간단한 방법)
+                    def currentBranch = env.GIT_BRANCH ?: env.BRANCH_NAME ?: 'unknown'
+                    def branchNameClean = currentBranch.replaceAll('^origin/', '').replaceAll('^refs/heads/', '')
+                    
+                    // 이미지 태그 생성 전략
                     def imageTag
                     def deploymentStrategy
 
                     switch(branchNameClean) {
                         case 'main':
-                            imageTag = "v${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
+                        case 'master':
+                            imageTag = "v$${env.BUILD_NUMBER}-$${env.GIT_COMMIT_SHORT}"
                             deploymentStrategy = "production"
                             break
                         case 'cloud':
-                            imageTag = "canary-${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
+                        case 'cloud-deploy':
+                            imageTag = "canary-$${env.BUILD_NUMBER}-$${env.GIT_COMMIT_SHORT}"
                             deploymentStrategy = "canary"
                             break
                         case 'dev':
-                            imageTag = "dev-${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
+                        case 'develop':
+                        case 'development':
+                            imageTag = "dev-$${env.BUILD_NUMBER}-$${env.GIT_COMMIT_SHORT}"
                             deploymentStrategy = "development"
                             break
                         default:
-                            imageTag = "${branchNameClean}-${env.GIT_COMMIT_SHORT}"
+                            imageTag = "$${branchNameClean}-$${env.GIT_COMMIT_SHORT}"
                             deploymentStrategy = "feature"
                     }
 
@@ -132,7 +100,7 @@ pipeline {
                         echo "네임스페이스: app (단일 네임스페이스 사용)"
 
                         # app 네임스페이스 생성 (모든 환경에서 동일하게 사용)
-                        /usr/local/bin/kubectl create namespace app --dry-run=client -o yaml | \
+                        /usr/local/bin/kubectl create namespace app --dry-run=client -o yaml | \\
                             /usr/local/bin/kubectl apply -f -
 
                         # 임시 properties 파일 생성
@@ -222,33 +190,33 @@ EOF
 
                         echo "=== app 네임스페이스에 ConfigMap/Secret 적용 ==="
                         # 공통 ConfigMap 생성
-                        /usr/local/bin/kubectl create configmap common-config -n app \
-                          --from-env-file=/tmp/k8s-config/common-config.properties \
+                        /usr/local/bin/kubectl create configmap common-config -n app \\
+                          --from-env-file=/tmp/k8s-config/common-config.properties \\
                           --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
 
                         # 공통 Secret 생성
-                        /usr/local/bin/kubectl create secret generic common-secrets -n app \
-                          --from-env-file=/tmp/k8s-config/common-secrets.properties \
+                        /usr/local/bin/kubectl create secret generic common-secrets -n app \\
+                          --from-env-file=/tmp/k8s-config/common-secrets.properties \\
                           --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
 
                         # Auth Service ConfigMap 생성
-                        /usr/local/bin/kubectl create configmap auth-service-config -n app \
-                          --from-env-file=/tmp/k8s-config/auth-service-config.properties \
+                        /usr/local/bin/kubectl create configmap auth-service-config -n app \\
+                          --from-env-file=/tmp/k8s-config/auth-service-config.properties \\
                           --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
 
                         # Auth Service Secret 생성
-                        /usr/local/bin/kubectl create secret generic auth-service-secret -n app \
-                          --from-env-file=/tmp/k8s-config/auth-service-secrets.properties \
+                        /usr/local/bin/kubectl create secret generic auth-service-secret -n app \\
+                          --from-env-file=/tmp/k8s-config/auth-service-secrets.properties \\
                           --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
 
                         # User Service ConfigMap 생성
-                        /usr/local/bin/kubectl create configmap user-service-config -n app \
-                          --from-env-file=/tmp/k8s-config/user-service-config.properties \
+                        /usr/local/bin/kubectl create configmap user-service-config -n app \\
+                          --from-env-file=/tmp/k8s-config/user-service-config.properties \\
                           --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
 
                         # User Service Secret 생성 (현재는 비어있지만 구조 유지)
-                        /usr/local/bin/kubectl create secret generic user-service-secret -n app \
-                          --from-env-file=/tmp/k8s-config/user-service-secrets.properties \
+                        /usr/local/bin/kubectl create secret generic user-service-secret -n app \\
+                          --from-env-file=/tmp/k8s-config/user-service-secrets.properties \\
                           --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
 
                         echo "=== ConfigMap/Secret 생성 완료 ==="
@@ -306,7 +274,7 @@ EOF
                         . $CONFIG_FILE
                         export ECR_REGISTRY=$${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com
                         
-                        /usr/local/bin/aws ecr get-login-password --region $AWS_REGION | \
+                        /usr/local/bin/aws ecr get-login-password --region $AWS_REGION | \\
                             docker login --username AWS --password-stdin $ECR_REGISTRY
                     '''
                 }
@@ -363,7 +331,7 @@ EOF
                         # Auth Service 빌드
                         echo "=== Auth Service 빌드 ==="
                         ./gradlew :auth-service:build -x test --no-daemon
-                        docker build -f ./auth-service/Dockerfile \
+                        docker build -f ./auth-service/Dockerfile \\
                             -t $${ECR_REGISTRY}/$${ECR_PREFIX}/auth-service:${IMAGE_TAG} .
                         docker push $${ECR_REGISTRY}/$${ECR_PREFIX}/auth-service:${IMAGE_TAG}
                         apply_deployment_tags "auth-service"
@@ -371,7 +339,7 @@ EOF
                         # User Service 빌드
                         echo "=== User Service 빌드 ==="
                         ./gradlew :user-service:build -x test --no-daemon
-                        docker build -f ./user-service/Dockerfile \
+                        docker build -f ./user-service/Dockerfile \\
                             -t $${ECR_REGISTRY}/$${ECR_PREFIX}/user-service:${IMAGE_TAG} .
                         docker push $${ECR_REGISTRY}/$${ECR_PREFIX}/user-service:${IMAGE_TAG}
                         apply_deployment_tags "user-service"
@@ -409,13 +377,13 @@ EOF
                             echo "사용할 이미지 태그: ${ACTUAL_IMAGE_TAG}"
                             
                             # 이미지 관련 변수만 치환 (환경변수는 ConfigMap에서 처리)
-                            sed \
-                                -e "s|\\\${ECR_REGISTRY}|${ECR_REGISTRY}|g" \
-                                -e "s|\\\${ECR_PREFIX}|${ECR_PREFIX}|g" \
-                                -e "s|\\\${IMAGE_TAG}|${ACTUAL_IMAGE_TAG}|g" \
-                                -e "s|\\\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \
-                                -e "s|\\\${AWS_REGION}|${AWS_REGION}|g" \
-                                -e "s|\\\${AWS_ACCOUNT_ID}|${AWS_ACCOUNT_ID}|g" \
+                            sed \\
+                                -e "s|\\${ECR_REGISTRY}|${ECR_REGISTRY}|g" \\
+                                -e "s|\\${ECR_PREFIX}|${ECR_PREFIX}|g" \\
+                                -e "s|\\${IMAGE_TAG}|${ACTUAL_IMAGE_TAG}|g" \\
+                                -e "s|\\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \\
+                                -e "s|\\${AWS_REGION}|${AWS_REGION}|g" \\
+                                -e "s|\\${AWS_ACCOUNT_ID}|${AWS_ACCOUNT_ID}|g" \\
                                 "$$input_file" > "$$output_file"
 
                             echo "치환 완료: $$(wc -l < "$$output_file") 라인"
