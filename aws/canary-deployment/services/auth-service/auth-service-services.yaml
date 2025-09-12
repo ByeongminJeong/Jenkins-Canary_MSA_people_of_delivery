@@ -7,11 +7,12 @@ metadata:
   namespace: app
   labels:
     app: auth
+    version: stable  # 이 라벨이 중요!
 spec:
   selector:
     app: auth
     service: auth-service
-    version: stable  # 이게 중요!
+    version: stable
   ports:
   - name: http
     port: 80
@@ -19,7 +20,7 @@ spec:
   type: ClusterIP
 
 ---
-# 카나리 버전용 서비스  
+# 카나리 버전용 서비스
 apiVersion: v1
 kind: Service
 metadata:
@@ -27,11 +28,12 @@ metadata:
   namespace: app
   labels:
     app: auth
+    version: canary  # 이 라벨이 중요!
 spec:
   selector:
     app: auth
     service: auth-service
-    version: canary  # 이게 중요!
+    version: canary
   ports:
   - name: http
     port: 80
@@ -39,7 +41,7 @@ spec:
   type: ClusterIP
 
 ---
-# 메인 서비스 (기본적으로 stable 연결)
+# 메인 서비스
 apiVersion: v1
 kind: Service
 metadata:
@@ -47,11 +49,12 @@ metadata:
   namespace: app
   labels:
     app: auth
+    version: stable  # 이 라벨이 중요!
 spec:
   selector:
     app: auth
     service: auth-service
-    version: stable  # stable만 연결
+    version: stable
   ports:
   - name: http
     port: 80
