@@ -4,13 +4,15 @@ metadata:
   name: app-ingress
   namespace: app
   annotations:
-    alb.ingress.kubernetes.io/group.name: app-ingress
-    alb.ingress.kubernetes.io/group.order: "1"
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
     alb.ingress.kubernetes.io/healthcheck-port: traffic-port
-    alb.ingress.kubernetes.io/scheme: internal
     alb.ingress.kubernetes.io/success-codes: "200"
-    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: app-ingress
+    alb.ingress.kubernetes.io/group.order: '1'
+    alb.ingress.kubernetes.io/load-balancer-attributes: routing.http2.enabled=true
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=60
 spec:
   ingressClassName: alb
   rules:
@@ -18,14 +20,14 @@ spec:
       paths:
       - backend:
           service:
-            name: auth-service-stable  # 변경!
+            name: auth-service-stable
             port:
               number: 80
         path: /auth
         pathType: Prefix
       - backend:
           service:
-            name: user-service-stable  # 변경!
+            name: user-service-stable
             port:
               number: 80
         path: /users
