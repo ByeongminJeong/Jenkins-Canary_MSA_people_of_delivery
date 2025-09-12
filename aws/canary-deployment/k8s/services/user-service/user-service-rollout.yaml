@@ -1,0 +1,201 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: user-service-rollout
+  namespace: app
+  labels:
+    app: user
+    service: user-service
+spec:
+  replicas: 3  # 프로덕션 안정성을 위해 증가
+
+  # 카나리 배포 전략 개선 - main, dev, canary 브랜치별 최적화
+  strategy:
+    canary:
+      steps:
+      - setWeight: 10        # 1단계: 10% (빠른 초기 검증)
+      - pause: {duration: 30s}
+
+      - analysis:            # 2단계: 초기 분석
+          templates:
+          - templateName: user-service-success-rate
+          args:
+          - name: service-name
+            value: user-service
+      
+      - setWeight: 25        # 3단계: 25% (중간 검증)
+      - pause: {duration: 60s}
+
+      - analysis:            # 4단계: 중간 분석
+          templates:
+          - templateName: user-service-success-rate
+          args:
+          - name: service-name
+            value: user-service
+      
+      - setWeight: 50        # 5단계: 50% (충분한 검증)
+      - pause: {duration: 120s}
+
+      - analysis:            # 6단계: 최종 분석
+          templates:
+          - templateName: user-service-success-rate
+          args:
+          - name: service-name
+            value: user-service
+      
+      - setWeight: 100       # 7단계: 100% (완전 전환)
+
+      # 서비스 설정
+      canaryService: user-service-canary
+      stableService: user-service-stable
+      
+      # 트래픽 관리
+      trafficRouting:
+        alb:
+          ingress: app-ingress
+          servicePort: 80
+
+  revisionHistoryLimit: 10
+
+  selector:
+    matchLabels:
+      app: user
+      service: user-service
+
+  template:
+    metadata:
+      labels:
+        app: user
+        service: user-service
+        version: "${IMAGE_TAG}"
+    spec:
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: app-ng
+      tolerations:
+        - key: "app"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+      
+      terminationGracePeriodSeconds: 30
+
+      containers:
+      - name: user-service
+        image: ${ECR_REGISTRY}/${ECR_PREFIX}/user-service:${IMAGE_TAG}
+        ports:
+        - containerPort: 8014
+          name: http
+          protocol: TCP
+
+        # 환경변수
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "production"
+        - name: DEPLOYMENT_STRATEGY
+          value: "${DEPLOYMENT_STRATEGY}"
+        - name: IMAGE_TAG
+          value: "${IMAGE_TAG}"
+
+        # 데이터베이스 설정 (Jenkins 환경변수에서 직접 주입)
+        - name: SPRING_DATASOURCE_URL
+          value: "${DB_URL}"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "${DB_USERNAME}"
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: "${DB_PASSWORD}"
+
+        # JWT 설정
+        - name: JWT_SECRET
+          value: "${JWT_SECRET}"
+        - name: JWT_REFRESH_SECRET
+          value: "${JWT_REFRESH_SECRET}"
+
+        # Redis 설정
+        - name: SPRING_REDIS_HOST
+          value: "${REDIS_HOST}"
+        - name: SPRING_REDIS_PORT
+          value: "${REDIS_PORT}"
+
+        # 이메일 설정
+        - name: SPRING_MAIL_USERNAME
+          value: "${MAIL_USERNAME}"
+        - name: SPRING_MAIL_PASSWORD
+          value: "${MAIL_PASSWORD}"
+
+        # Google OAuth 설정
+        - name: GOOGLE_CLIENT_ID
+          value: "${GOOGLE_CLIENT_ID}"
+        - name: GOOGLE_CLIENT_SECRET_ID
+          value: "${GOOGLE_CLIENT_SECRET_ID}"
+
+        # User Service 특화 설정
+        - name: USER_SERVICE_PASSPORT_SECRET
+          value: "${USER_SERVICE_PASSPORT_SECRET}"
+
+        # 서비스 발견
+        - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+          value: "http://discovery-service:8761/eureka"
+
+        # 헬스체크
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8014
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8014
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8014
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+
+        # 리소스 관리
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+
+        # 보안 설정
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: logs-volume
+          mountPath: /app/logs
+
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}
+      - name: logs-volume
+        emptyDir: {}
+
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsUser: 1000

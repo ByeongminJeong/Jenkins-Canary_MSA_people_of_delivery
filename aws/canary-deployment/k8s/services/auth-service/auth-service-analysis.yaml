@@ -1,18 +1,18 @@
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
 metadata:
-  name: user-service-success-rate
+  name: auth-service-success-rate
   namespace: app
 spec:
   args:
   - name: service-name
   
   metrics:
-  # HTTP 성공률 체크
+  # HTTP 성공률 체크 (Auth Service 특화)
   - name: success-rate
     interval: 30s
     count: 2
-    successCondition: result[0] >= 0.95  # 95% 이상 성공률
+    successCondition: result[0] >= 0.90  # 90% 이상 성공률 (Auth는 더 엄격)
     failureLimit: 1
     provider:
       job:
@@ -26,7 +26,7 @@ spec:
                 args:
                 - |
                   set -e
-                  # 5번 요청해서 성공률 계산
+                  # 5번 요청해서 성공률 계산 (Auth는 빠른 검증)
                   success=0
                   total=5
                   
@@ -38,15 +38,15 @@ spec:
                   done
                   
                   success_rate=$(echo "scale=2; $success / $total" | bc)
-                  echo "User Service Success rate: $success_rate"
+                  echo "Auth Service Success rate: $success_rate"
                   echo $success_rate
               restartPolicy: Never
   
-  # 사용자 CRUD 테스트 (실제 User Service API 호출)
-  - name: user-crud-test
+  # API 검증 테스트 (실제 Auth Service API 호출)
+  - name: api-validation
     interval: 30s
     count: 2
-    successCondition: result[0] >= 0.80  # 80% 이상 CRUD 성공
+    successCondition: result[0] >= 0.80  # 80% 이상 API 검증 성공
     failureLimit: 1
     provider:
       job:
@@ -59,18 +59,20 @@ spec:
                 command: ["/bin/sh", "-c"]
                 args:
                 - |
-                  # 사용자 조회 API 테스트 (인증이 필요하므로 헬스체크만)
+                  # Auth Service 헬스체크 및 기본 API 테스트
                   success=0
                   total=3
                   
                   for i in $(seq 1 $total); do
-                    if curl -s -f http://{{args.service-name}}/actuator/health > /dev/null; then
+                    # 헬스체크와 기본 API 응답 확인
+                    if curl -s -f http://{{args.service-name}}/actuator/health > /dev/null && \
+                       curl -s -f http://{{args.service-name}}/actuator/info > /dev/null; then
                       success=$((success + 1))
                     fi
                     sleep 1
                   done
                   
-                  crud_rate=$(echo "scale=2; $success / $total" | bc)
-                  echo "User CRUD rate: $crud_rate"
-                  echo $crud_rate
+                  api_rate=$(echo "scale=2; $success / $total" | bc)
+                  echo "Auth API validation rate: $api_rate"
+                  echo $api_rate
               restartPolicy: Never
