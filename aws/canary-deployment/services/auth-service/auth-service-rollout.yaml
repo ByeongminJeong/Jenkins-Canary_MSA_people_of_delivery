@@ -77,16 +77,12 @@ spec:
           name: http
           protocol: TCP
 
-        # ConfigMap과 Secret에서 환경변수 로드 (순서 중요!)
+        # ConfigMap과 Secret에서 환경변수 로드
         envFrom:
         - configMapRef:
-            name: common-config           # 공통 설정 먼저
+            name: app-config
         - secretRef:
-            name: common-secrets          # 공통 시크릿
-        - configMapRef:
-            name: auth-service-config     # Auth Service 전용 설정
-        - secretRef:
-            name: auth-service-secret     # Auth Service 전용 시크릿
+            name: app-secrets
 
         # 헬스체크 (TCP로 변경하여 안정성 향상)
         startupProbe:

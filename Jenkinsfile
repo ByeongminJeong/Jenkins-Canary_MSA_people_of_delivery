@@ -86,24 +86,23 @@ pipeline {
 
         stage('Create ConfigMaps and Secrets') {
             steps {
-                echo "ConfigMap 및 Secret 생성 중..."
+                echo "통합 ConfigMap 및 Secret 생성 중..."
                 configFileProvider([configFile(fileId: 'all-services', variable: 'CONFIG_FILE')]) {
                     sh '''
                         . $CONFIG_FILE
                         
-                        echo "=== ConfigMap/Secret 생성 - ${DEPLOYMENT_STRATEGY} 환경 ==="
+                        echo "=== 통합 ConfigMap/Secret 생성 - ${DEPLOYMENT_STRATEGY} 환경 ==="
                         echo "네임스페이스: app (단일 네임스페이스 사용)"
 
-                        # app 네임스페이스 생성 (모든 환경에서 동일하게 사용)
+                        # app 네임스페이스 생성
                         /usr/local/bin/kubectl create namespace app --dry-run=client -o yaml | \\
                             /usr/local/bin/kubectl apply -f -
 
                         # 임시 properties 파일 생성
                         mkdir -p /tmp/k8s-config
                         
-                        echo "=== 공통 ConfigMap 생성 (모든 서비스 공유) ==="
-                        # 공통 ConfigMap - 모든 서비스가 공유하는 설정
-                        cat > /tmp/k8s-config/common-config.properties << EOF
+                        echo "=== 통합 ConfigMap 생성 (모든 서비스 공통) ==="
+                        cat > /tmp/k8s-config/app-config.properties << EOF
 # Spring 기본 설정
 SPRING_PROFILES_ACTIVE=production
 DEPLOYMENT_STRATEGY=${DEPLOYMENT_STRATEGY}
@@ -113,38 +112,53 @@ EUREKA_CLIENT_ENABLED=false
 # 데이터베이스 설정
 SPRING_DATASOURCE_URL=${DB_URL}
 
-# Redis 설정 (Auth, User 서비스 공통)
+# Redis 설정
 SPRING_REDIS_HOST=${REDIS_HOST}
 SPRING_REDIS_PORT=${REDIS_PORT}
 
 # JWT 설정
 JWT_EXPIRATION=3600000
 
-# 이메일 설정 (Auth, User 서비스 공통)
+# 이메일 설정
 SPRING_MAIL_USERNAME=${MAIL_USERNAME}
 
-# Google OAuth 설정 (Auth, User 서비스 공통)
+# Google OAuth 설정
 GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
 
 # 도메인 설정
 DOMAIN=${DOMAIN}
+
+# Auth Service 설정
+AUTH_SERVICE_PORT=${AUTH_SERVICE_PORT}
+AUTH_SERVICE_HEALTH_CHECK_PATH=${AUTH_SERVICE_HEALTH_CHECK_PATH}
+
+# User Service 설정
+USER_SERVICE_PORT=${USER_SERVICE_PORT}
+USER_SERVICE_HEALTH_CHECK_PATH=${USER_SERVICE_HEALTH_CHECK_PATH}
+
+# Module Common 설정
+MODULE_COMMON_SERVICE_PORT=${MODULE_COMMON_SERVICE_PORT}
+MODULE_COMMON_SERVICE_HEALTH_CHECK_PATH=${MODULE_COMMON_SERVICE_HEALTH_CHECK_PATH}
 EOF
 
-                        echo "=== 공통 Secret 생성 (모든 서비스 공유) ==="
-                        # 공통 Secret - 모든 서비스가 공유하는 민감한 정보
-                        cat > /tmp/k8s-config/common-secrets.properties << EOF
+                        echo "=== 통합 Secret 생성 (모든 서비스 공통) ==="
+                        cat > /tmp/k8s-config/app-secrets.properties << EOF
 # 데이터베이스 인증 정보
 SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
 SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
 
-# JWT 시크릿 (Auth, User 서비스 공통)
+# JWT 시크릿
 JWT_SECRET=${JWT_SECRET}
 JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
 
-# 이메일 인증 정보 (Auth, User 서비스 공통)
+# 패스포트 시크릿
+PASSPORT_SECRET=${PASSPORT_SECRET}
+AUTH_SERVICE_PASSPORT_SECRET=${PASSPORT_SECRET}
+
+# 이메일 인증 정보
 SPRING_MAIL_PASSWORD=${MAIL_PASSWORD}
 
-# Google OAuth 시크릿 (Auth, User 서비스 공통)
+# Google OAuth 시크릿
 GOOGLE_CLIENT_SECRET_ID=${GOOGLE_CLIENT_SECRET_ID}
 
 # AWS 인증 정보
@@ -152,86 +166,29 @@ AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF
 
-                        echo "=== Auth Service 전용 ConfigMap 생성 ==="
-                        # Auth Service 전용 ConfigMap
-                        cat > /tmp/k8s-config/auth-service-config.properties << EOF
-# Auth Service 특화 설정
-AUTH_SERVICE_PORT=${AUTH_SERVICE_PORT}
-AUTH_SERVICE_HEALTH_CHECK_PATH=${AUTH_SERVICE_HEALTH_CHECK_PATH}
-EOF
-
-                        echo "=== Auth Service 전용 Secret 생성 ==="
-                        # Auth Service 전용 Secret
-                        cat > /tmp/k8s-config/auth-service-secrets.properties << EOF
-# Auth Service 전용 패스포트 시크릿
-PASSPORT_SECRET=${PASSPORT_SECRET}
-AUTH_SERVICE_PASSPORT_SECRET=${PASSPORT_SECRET}
-EOF
-
-                        echo "=== User Service 전용 ConfigMap 생성 ==="
-                        # User Service 전용 ConfigMap
-                        cat > /tmp/k8s-config/user-service-config.properties << EOF
-# User Service 특화 설정
-USER_SERVICE_PORT=${USER_SERVICE_PORT}
-USER_SERVICE_HEALTH_CHECK_PATH=${USER_SERVICE_HEALTH_CHECK_PATH}
-EOF
-
-                        echo "=== User Service 전용 Secret 생성 ==="
-                        # User Service 전용 Secret (현재는 비어있지만 필요시 추가)
-                        cat > /tmp/k8s-config/user-service-secrets.properties << EOF
-# User Service 전용 시크릿 (필요시 추가)
-# USER_SERVICE_SPECIFIC_SECRET=value
-EOF
-
-                        echo "=== app 네임스페이스에 ConfigMap/Secret 적용 ==="
-                        # 공통 ConfigMap 생성
-                        /usr/local/bin/kubectl create configmap common-config -n app \\
-                          --from-env-file=/tmp/k8s-config/common-config.properties \\
+                        echo "=== app 네임스페이스에 통합 ConfigMap/Secret 적용 ==="
+                        # 통합 ConfigMap 생성
+                        /usr/local/bin/kubectl create configmap app-config -n app \\
+                          --from-env-file=/tmp/k8s-config/app-config.properties \\
                           --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
 
-                        # 공통 Secret 생성
-                        /usr/local/bin/kubectl create secret generic common-secrets -n app \\
-                          --from-env-file=/tmp/k8s-config/common-secrets.properties \\
+                        # 통합 Secret 생성
+                        /usr/local/bin/kubectl create secret generic app-secrets -n app \\
+                          --from-env-file=/tmp/k8s-config/app-secrets.properties \\
                           --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
 
-                        # Auth Service ConfigMap 생성
-                        /usr/local/bin/kubectl create configmap auth-service-config -n app \\
-                          --from-env-file=/tmp/k8s-config/auth-service-config.properties \\
-                          --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
-
-                        # Auth Service Secret 생성
-                        /usr/local/bin/kubectl create secret generic auth-service-secret -n app \\
-                          --from-env-file=/tmp/k8s-config/auth-service-secrets.properties \\
-                          --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
-
-                        # User Service ConfigMap 생성
-                        /usr/local/bin/kubectl create configmap user-service-config -n app \\
-                          --from-env-file=/tmp/k8s-config/user-service-config.properties \\
-                          --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
-
-                        # User Service Secret 생성 (현재는 비어있지만 구조 유지)
-                        /usr/local/bin/kubectl create secret generic user-service-secret -n app \\
-                          --from-env-file=/tmp/k8s-config/user-service-secrets.properties \\
-                          --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
-
-                        echo "=== ConfigMap/Secret 생성 완료 ==="
+                        echo "=== 통합 ConfigMap/Secret 생성 완료 ==="
                         echo ""
-                        echo "생성된 ConfigMap 목록:"
-                        /usr/local/bin/kubectl get configmap -n app | grep -E "(common-config|auth-service|user-service)" || true
+                        echo "생성된 리소스:"
+                        /usr/local/bin/kubectl get configmap,secret -n app | grep app- || true
                         echo ""
-                        echo "생성된 Secret 목록:"
-                        /usr/local/bin/kubectl get secret -n app | grep -E "(common-secrets|auth-service|user-service)" || true
-                        echo ""
-                        echo "공통 ConfigMap 내용 (일부):"
-                        /usr/local/bin/kubectl get configmap common-config -n app -o yaml | head -20 || true
-                        echo ""
-                        echo "Auth Service ConfigMap 내용:"
-                        /usr/local/bin/kubectl get configmap auth-service-config -n app -o yaml | head -15 || true
+                        echo "ConfigMap 내용 (일부):"
+                        /usr/local/bin/kubectl get configmap app-config -n app -o yaml | head -30 || true
                         
                         # 임시 파일 정리
                         rm -rf /tmp/k8s-config
                         
-                        echo "ConfigMap/Secret 생성 및 적용 완료! (app 네임스페이스)"
+                        echo "통합 ConfigMap/Secret 생성 완료! (app 네임스페이스)"
                     '''
                 }
             }
@@ -267,7 +224,7 @@ EOF
                 configFileProvider([configFile(fileId: 'all-services', variable: 'CONFIG_FILE')]) {
                     sh '''
                         . $CONFIG_FILE
-                        export ECR_REGISTRY=$${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com
+                        export ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
                         
                         /usr/local/bin/aws ecr get-login-password --region $AWS_REGION | \\
                             docker login --username AWS --password-stdin $ECR_REGISTRY
@@ -282,7 +239,7 @@ EOF
                 configFileProvider([configFile(fileId: 'all-services', variable: 'CONFIG_FILE')]) {
                     sh '''
                         . $CONFIG_FILE
-                        export ECR_REGISTRY=$${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com
+                        export ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
                         
                         echo "=== 빌드 정보 ==="
                         echo "브랜치: ${BRANCH_NAME_CLEAN}"
@@ -294,27 +251,27 @@ EOF
                         
                         # 브랜치별 태그 전략 함수
                         apply_deployment_tags() {
-                            local service_name="\$1"
-                            local image_path="$${ECR_REGISTRY}/$${ECR_PREFIX}/${service_name}"
+                            local service_name="$1"
+                            local image_path="${ECR_REGISTRY}/${ECR_PREFIX}/${service_name}"
                             
                             echo "=== ${service_name} 태그 적용 ==="
 
                             case "${DEPLOYMENT_STRATEGY}" in
                                 production)
                                     echo "프로덕션 배포 - latest, stable 태그 추가"
-                                    docker tag $${image_path}:$${IMAGE_TAG} ${image_path}:latest
-                                    docker tag $${image_path}:$${IMAGE_TAG} ${image_path}:stable
+                                    docker tag ${image_path}:${IMAGE_TAG} ${image_path}:latest
+                                    docker tag ${image_path}:${IMAGE_TAG} ${image_path}:stable
                                     docker push ${image_path}:latest
                                     docker push ${image_path}:stable
                                     ;;
                                 canary)
                                     echo "카나리 배포 - canary 태그 추가"
-                                    docker tag $${image_path}:$${IMAGE_TAG} ${image_path}:canary
+                                    docker tag ${image_path}:${IMAGE_TAG} ${image_path}:canary
                                     docker push ${image_path}:canary
                                     ;;
                                 development)
                                     echo "개발 배포 - dev 태그 추가"
-                                    docker tag $${image_path}:$${IMAGE_TAG} ${image_path}:dev
+                                    docker tag ${image_path}:${IMAGE_TAG} ${image_path}:dev
                                     docker push ${image_path}:dev
                                     ;;
                                 feature)
@@ -327,16 +284,16 @@ EOF
                         echo "=== Auth Service 빌드 ==="
                         ./gradlew :auth-service:build -x test --no-daemon
                         docker build -f ./auth-service/Dockerfile \\
-                            -t $${ECR_REGISTRY}/$${ECR_PREFIX}/auth-service:${IMAGE_TAG} .
-                        docker push $${ECR_REGISTRY}/$${ECR_PREFIX}/auth-service:${IMAGE_TAG}
+                            -t ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:${IMAGE_TAG} .
+                        docker push ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:${IMAGE_TAG}
                         apply_deployment_tags "auth-service"
 
                         # User Service 빌드
                         echo "=== User Service 빌드 ==="
                         ./gradlew :user-service:build -x test --no-daemon
                         docker build -f ./user-service/Dockerfile \\
-                            -t $${ECR_REGISTRY}/$${ECR_PREFIX}/user-service:${IMAGE_TAG} .
-                        docker push $${ECR_REGISTRY}/$${ECR_PREFIX}/user-service:${IMAGE_TAG}
+                            -t ${ECR_REGISTRY}/${ECR_PREFIX}/user-service:${IMAGE_TAG} .
+                        docker push ${ECR_REGISTRY}/${ECR_PREFIX}/user-service:${IMAGE_TAG}
                         apply_deployment_tags "user-service"
 
                         echo "=== 빌드 완료 ==="
@@ -351,15 +308,15 @@ EOF
                 configFileProvider([configFile(fileId: 'all-services', variable: 'CONFIG_FILE')]) {
                     sh '''
                         . $CONFIG_FILE
-                        export ECR_REGISTRY=$${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com
+                        export ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
                         
                         echo "=== 배포 전략: ${DEPLOYMENT_STRATEGY} ==="
                         echo "네임스페이스: app (단일 네임스페이스 사용)"
                         
                         # sed를 사용한 환경변수 치환 함수 (이미지 정보만 처리)
                         substitute_vars() {
-                            local input_file="\$1"
-                            local output_file="\$2"
+                            local input_file="$1"
+                            local output_file="$2"
 
                             # 카나리 배포에서는 IMAGE_TAG를 "canary"로 고정
                             local ACTUAL_IMAGE_TAG="${IMAGE_TAG}"
@@ -368,7 +325,7 @@ EOF
                                 echo "카나리 배포: 이미지 태그를 'canary'로 설정"
                             fi
 
-                            echo "sed로 환경변수 치환 중: $$input_file -> $$output_file"
+                            echo "sed로 환경변수 치환 중: $input_file -> $output_file"
                             echo "사용할 이미지 태그: ${ACTUAL_IMAGE_TAG}"
                             
                             # 이미지 관련 변수만 치환 (환경변수는 ConfigMap에서 처리)
@@ -379,9 +336,9 @@ EOF
                                 -e "s|\\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \\
                                 -e "s|\\${AWS_REGION}|${AWS_REGION}|g" \\
                                 -e "s|\\${AWS_ACCOUNT_ID}|${AWS_ACCOUNT_ID}|g" \\
-                                "$$input_file" > "$$output_file"
+                                "$input_file" > "$output_file"
 
-                            echo "치환 완료: $$(wc -l < "$$output_file") 라인"
+                            echo "치환 완료: $(wc -l < "$output_file") 라인"
                         }
 
                         # 배포 전략별 처리 (모두 app 네임스페이스 사용)
@@ -422,7 +379,7 @@ EOF
                                 /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n app
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/user-rollout.yaml -n app
 
-                                echo "카나리 배포 시작됨 - ConfigMap/Secret 기반 환경변수 사용"
+                                echo "카나리 배포 시작됨 - 통합 ConfigMap/Secret 기반 환경변수 사용"
                                 echo "모니터링 명령어:"
                                 echo "  kubectl argo rollouts get rollout auth-service-rollout -n app --watch"
                                 echo "  kubectl argo rollouts get rollout user-service-rollout -n app --watch"
@@ -447,7 +404,7 @@ EOF
                                 /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n app
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/user-rollout.yaml -n app
 
-                                echo "프로덕션 배포 완료 - ConfigMap/Secret 기반"
+                                echo "프로덕션 배포 완료 - 통합 ConfigMap/Secret 기반"
                                 ;;
                             development|feature)
                                 echo "=== ${DEPLOYMENT_STRATEGY} 배포 ==="
@@ -462,7 +419,7 @@ EOF
                                 /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n app
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/user-rollout.yaml -n app
                                 
-                                echo "${DEPLOYMENT_STRATEGY} 배포 완료 - ConfigMap/Secret 기반"
+                                echo "${DEPLOYMENT_STRATEGY} 배포 완료 - 통합 ConfigMap/Secret 기반"
                                 ;;
                         esac
                     '''
@@ -478,12 +435,12 @@ EOF
                     echo "배포 전략: ${DEPLOYMENT_STRATEGY}"
                     echo ""
                     
-                    echo "공통 ConfigMap/Secret 상태:"
-                    /usr/local/bin/kubectl get configmap,secret -n app | grep -E "(common-config|common-secrets)" || true
+                    echo "통합 ConfigMap/Secret 상태:"
+                    /usr/local/bin/kubectl get configmap,secret -n app | grep app- || true
                     echo ""
                     
-                    echo "서비스별 ConfigMap/Secret 상태:"
-                    /usr/local/bin/kubectl get configmap,secret -n app | grep -E "(auth-service|user-service)" || true
+                    echo "ConfigMap 내용 확인:"
+                    /usr/local/bin/kubectl describe configmap app-config -n app | head -20 || true
                     echo ""
                     
                     case "${DEPLOYMENT_STRATEGY}" in
@@ -513,7 +470,7 @@ EOF
                     echo "배포 전략: ${DEPLOYMENT_STRATEGY}"
                     echo "이미지 태그: ${IMAGE_TAG}"
                     echo "네임스페이스: app (단일 네임스페이스)"
-                    echo "환경변수 관리: 공통 ConfigMap/Secret + 서비스별 ConfigMap/Secret"
+                    echo "환경변수 관리: 통합 ConfigMap(app-config) + 통합 Secret(app-secrets)"
                 '''
             }
         }
@@ -532,9 +489,9 @@ EOF
 - 브랜치: ${env.BRANCH_NAME_CLEAN}
 - 이미지: canary 태그  
 - 네임스페이스: app
+- 환경변수: 통합 ConfigMap/Secret 사용
 - 단계: 10% → 25% → 50% → 100% 자동 진행
 - 모니터링: kubectl argo rollouts get rollout auth-service-rollout -n app --watch
-- 수동 진행: kubectl argo rollouts promote auth-service-rollout -n app
 """
                         break
                     case 'production':
@@ -543,7 +500,7 @@ EOF
 - 브랜치: ${env.BRANCH_NAME_CLEAN}
 - 이미지: latest, stable 태그
 - 네임스페이스: app
-- 안정적인 프로덕션 서비스 배포됨
+- 환경변수: 통합 ConfigMap/Secret 사용
 """
                         break
                     case 'development':
@@ -552,7 +509,7 @@ EOF
 - 브랜치: ${env.BRANCH_NAME_CLEAN}
 - 이미지: dev 태그
 - 네임스페이스: app
-- 개발 테스트 준비 완료
+- 환경변수: 통합 ConfigMap/Secret 사용
 """
                         break
                     default:
@@ -561,6 +518,7 @@ EOF
 - 브랜치: ${env.BRANCH_NAME_CLEAN}
 - 이미지: ${env.IMAGE_TAG}
 - 네임스페이스: app
+- 환경변수: 통합 ConfigMap/Secret 사용
 """
                 }
                 
@@ -592,15 +550,15 @@ EOF
                     docker images | grep -E "(auth-service|user-service)" | head -10 || echo "   Docker 이미지 없음"
                     
                     echo ""
-                    echo "4. ConfigMap/Secret 상태:"
-                    /usr/local/bin/kubectl get configmap,secret -n app | grep -E "(common|auth-service|user-service)" || echo "   ConfigMap/Secret 조회 실패"
+                    echo "4. 통합 ConfigMap/Secret 상태:"
+                    /usr/local/bin/kubectl get configmap,secret -n app | grep app- || echo "   통합 ConfigMap/Secret 조회 실패"
                     
                     echo ""
                     echo "=== 해결 방법 제안 ==="
                     echo "1. 의존성 문제인 경우: ./gradlew clean 후 재시도"
                     echo "2. Docker 문제인 경우: Docker 데몬 재시작"
                     echo "3. 개별 서비스 빌드 테스트: ./gradlew :auth-service:build -x test"
-                    echo "4. ConfigMap/Secret 문제인 경우: kubectl delete configmap,secret --all -n app 후 재시도"
+                    echo "4. ConfigMap/Secret 문제인 경우: kubectl delete configmap app-config secret app-secrets -n app 후 재시도"
                 '''
             }
         }
@@ -631,8 +589,8 @@ EOF
                     
                     echo ""
                     echo "=== 최종 배포 상태 확인 ==="
-                    echo "ConfigMap 개수: $(/usr/local/bin/kubectl get configmap -n app --no-headers | wc -l || echo '0')"
-                    echo "Secret 개수: $(/usr/local/bin/kubectl get secret -n app --no-headers | wc -l || echo '0')"
+                    echo "통합 ConfigMap: $(/usr/local/bin/kubectl get configmap app-config -n app --no-headers 2>/dev/null | wc -l || echo '0')"
+                    echo "통합 Secret: $(/usr/local/bin/kubectl get secret app-secrets -n app --no-headers 2>/dev/null | wc -l || echo '0')"
                     echo "Pod 개수: $(/usr/local/bin/kubectl get pods -n app --no-headers | wc -l || echo '0')"
                     
                     echo ""

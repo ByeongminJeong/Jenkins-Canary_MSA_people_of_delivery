@@ -80,13 +80,9 @@ spec:
         # ConfigMap과 Secret에서 환경변수 로드
         envFrom:
         - configMapRef:
-            name: common-config           # 공통 설정
+            name: app-config
         - secretRef:
-            name: common-secrets          # 공통 시크릿
-        - configMapRef:
-            name: user-service-config     # User Service 전용 설정
-        - secretRef:
-            name: user-service-secret     # User Service 전용 시크릿
+            name: app-secrets
 
         # 헬스체크
         startupProbe:
