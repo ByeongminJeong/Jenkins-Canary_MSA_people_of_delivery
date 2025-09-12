@@ -122,16 +122,16 @@ pipeline {
             }
         }
 
-        // 완전 순차 빌드로 변경
-        stage('Build All Services Sequentially') {
+        // 서비스 빌드 (Module Common 제거)
+        stage('Build Services') {
             steps {
-                echo "모든 서비스 순차 빌드 시작"
+                echo "서비스 빌드 시작"
                 configFileProvider([configFile(fileId: 'all-services', variable: 'CONFIG_FILE')]) {
                     sh '''
                         . $CONFIG_FILE
                         export ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
                         
-                        echo "🚀 완전 순차 빌드 시작 - 브랜치: ${BRANCH_NAME_CLEAN}, 태그: ${IMAGE_TAG}"
+                        echo "서비스 빌드 시작 - 브랜치: ${BRANCH_NAME_CLEAN}, 태그: ${IMAGE_TAG}"
                         
                         chmod +x ./gradlew
                         
@@ -167,27 +167,9 @@ pipeline {
                             esac
                         }
                         
-                        # 1️⃣ Module Common 빌드 (최우선)
+                        # Auth Service 빌드
                         echo ""
-                        echo "🔧 1️⃣ Module Common 빌드 시작"
-                        echo "================================================"
-                        ./gradlew :module-common:build -x test --no-daemon --refresh-dependencies
-                        
-                        echo "Module Common Docker 이미지 빌드..."
-                        docker build -f ./module-common/Dockerfile \
-                            -t ${ECR_REGISTRY}/${ECR_PREFIX}/module-common:${IMAGE_TAG} .
-                        docker push ${ECR_REGISTRY}/${ECR_PREFIX}/module-common:${IMAGE_TAG}
-                        
-                        apply_branch_tags "module-common"
-                        echo "✅ Module Common 빌드 완료"
-                        
-                        # Module Common JAR 파일 확인
-                        echo "Module Common JAR 확인:"
-                        find ./module-common/build/libs -name "*.jar" -type f | head -5
-                        
-                        # 2️⃣ Auth Service 빌드 (Module Common 의존성 해결 후)
-                        echo ""
-                        echo "🔐 2️⃣ Auth Service 빌드 시작"
+                        echo "Auth Service 빌드 시작"
                         echo "================================================"
                         ./gradlew :auth-service:build -x test --no-daemon
                         
@@ -197,11 +179,11 @@ pipeline {
                         docker push ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:${IMAGE_TAG}
                         
                         apply_branch_tags "auth-service"
-                        echo "✅ Auth Service 빌드 완료"
+                        echo "Auth Service 빌드 완료"
                         
-                        # 3️⃣ User Service 빌드
+                        # User Service 빌드
                         echo ""
-                        echo "👤 3️⃣ User Service 빌드 시작"
+                        echo "User Service 빌드 시작"
                         echo "================================================"
                         ./gradlew :user-service:build -x test --no-daemon
                         
@@ -211,25 +193,24 @@ pipeline {
                         docker push ${ECR_REGISTRY}/${ECR_PREFIX}/user-service:${IMAGE_TAG}
                         
                         apply_branch_tags "user-service"
-                        echo "✅ User Service 빌드 완료"
+                        echo "User Service 빌드 완료"
                         
                         echo ""
-                        echo "🎉 모든 서비스 순차 빌드 완료!"
+                        echo "모든 서비스 빌드 완료!"
                         echo "================================================"
-                        echo "✅ Module Common: ${ECR_REGISTRY}/${ECR_PREFIX}/module-common:${IMAGE_TAG}"
-                        echo "✅ Auth Service: ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:${IMAGE_TAG}"
-                        echo "✅ User Service: ${ECR_REGISTRY}/${ECR_PREFIX}/user-service:${IMAGE_TAG}"
+                        echo "Auth Service: ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:${IMAGE_TAG}"
+                        echo "User Service: ${ECR_REGISTRY}/${ECR_PREFIX}/user-service:${IMAGE_TAG}"
                         
                         # 브랜치별 추가 태그 정보
                         case "${BRANCH_NAME_CLEAN}" in
                             jenkins-canary|*canary*)
-                                echo "🔥 카나리 태그(canary)도 생성됨"
+                                echo "카나리 태그(canary)도 생성됨"
                                 ;;
                             main|master)
-                                echo "🚀 프로덕션 태그(latest)도 생성됨"
+                                echo "프로덕션 태그(latest)도 생성됨"
                                 ;;
                             develop|dev)
-                                echo "🛠️ 개발 태그(dev)도 생성됨"
+                                echo "개발 태그(dev)도 생성됨"
                                 ;;
                         esac
                     '''
@@ -255,23 +236,22 @@ pipeline {
                         case "${BRANCH_NAME_CLEAN}" in
                             jenkins-canary|*canary*)
                                 DEPLOY_TAG="canary"
-                                echo "🚀 카나리 배포 - canary 태그 사용"
+                                echo "카나리 배포 - canary 태그 사용"
                                 echo "카나리 배포 이미지들:"
-                                echo "  - ${ECR_REGISTRY}/${ECR_PREFIX}/module-common:canary"
                                 echo "  - ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:canary"
                                 echo "  - ${ECR_REGISTRY}/${ECR_PREFIX}/user-service:canary"
                                 ;;
                             main|master)
                                 DEPLOY_TAG="latest"
-                                echo "🚀 프로덕션 배포 - latest 태그 사용"
+                                echo "프로덕션 배포 - latest 태그 사용"
                                 ;;
                             develop|dev)
                                 DEPLOY_TAG="dev"
-                                echo "🚀 개발 배포 - dev 태그 사용"
+                                echo "개발 배포 - dev 태그 사용"
                                 ;;
                             *)
                                 DEPLOY_TAG="${IMAGE_TAG}"
-                                echo "🚀 피처 배포 - 특정 태그 사용: ${IMAGE_TAG}"
+                                echo "피처 배포 - 특정 태그 사용: ${IMAGE_TAG}"
                                 ;;
                         esac
                         
@@ -288,19 +268,14 @@ pipeline {
                             --from-literal=service-port="$USER_SERVICE_PORT" \
                             --from-literal=health-check-path="$USER_SERVICE_HEALTH_CHECK_PATH" \
                             --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
-                            
-                        /usr/local/bin/kubectl create configmap module-common-config -n app \
-                            --from-literal=service-port="$MODULE_COMMON_SERVICE_PORT" \
-                            --from-literal=health-check-path="$MODULE_COMMON_SERVICE_HEALTH_CHECK_PATH" \
-                            --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
                         
                         # 카나리 배포인 경우 특별 처리
                         if [ "$DEPLOY_TAG" = "canary" ]; then
-                            echo "🔥 카나리 배포 특별 설정 적용"
+                            echo "카나리 배포 특별 설정 적용"
                             echo "카나리 배포 준비 완료 - 수동 배포 또는 ArgoCD Rollout을 통해 진행하세요"
                         fi
                         
-                        echo "✅ 배포 설정 완료"
+                        echo "배포 설정 완료"
                     '''
                 }
             }
@@ -322,26 +297,26 @@ pipeline {
                     
                     case "${BRANCH_NAME_CLEAN}" in
                         jenkins-canary|*canary*)
-                            echo "✅ 추가 태그: canary (카나리 배포용)"
-                            echo "🔥 카나리 배포 준비 완료!"
+                            echo "추가 태그: canary (카나리 배포용)"
+                            echo "카나리 배포 준비 완료!"
                             ;;
                         main|master)
-                            echo "✅ 추가 태그: latest (프로덕션용)"
-                            echo "🚀 프로덕션 배포 준비 완료!"
+                            echo "추가 태그: latest (프로덕션용)"
+                            echo "프로덕션 배포 준비 완료!"
                             ;;
                         develop|dev)
-                            echo "✅ 추가 태그: dev (개발용)"
-                            echo "🛠️ 개발환경 배포 준비 완료!"
+                            echo "추가 태그: dev (개발용)"
+                            echo "개발환경 배포 준비 완료!"
                             ;;
                         *)
-                            echo "✅ 기본 태그만 생성"
-                            echo "📦 피처 브랜치 빌드 완료!"
+                            echo "기본 태그만 생성"
+                            echo "피처 브랜치 빌드 완료!"
                             ;;
                     esac
                     
                     echo ""
                     echo "=== ECR 푸시된 이미지들 ==="
-                    echo "📦 Module Common:"
+                    echo "Auth Service:"
                     echo "   - ${IMAGE_TAG}"
                     case "${BRANCH_NAME_CLEAN}" in
                         jenkins-canary|*canary*) echo "   - canary" ;;
@@ -349,15 +324,7 @@ pipeline {
                         develop|dev) echo "   - dev" ;;
                     esac
                     
-                    echo "🔐 Auth Service:"
-                    echo "   - ${IMAGE_TAG}"
-                    case "${BRANCH_NAME_CLEAN}" in
-                        jenkins-canary|*canary*) echo "   - canary" ;;
-                        main|master) echo "   - latest" ;;
-                        develop|dev) echo "   - dev" ;;
-                    esac
-                    
-                    echo "👤 User Service:"
+                    echo "User Service:"
                     echo "   - ${IMAGE_TAG}"
                     case "${BRANCH_NAME_CLEAN}" in
                         jenkins-canary|*canary*) echo "   - canary" ;;
@@ -372,7 +339,7 @@ pipeline {
     post {
         success {
             script {
-                echo "🎉 완전 순차 빌드 파이프라인 성공!"
+                echo "서비스 빌드 파이프라인 성공!"
                 echo "브랜치: ${env.BRANCH_NAME_CLEAN}"
                 echo "이미지 태그: ${env.IMAGE_TAG}"
                 
@@ -381,7 +348,7 @@ pipeline {
                 
                 switch(env.BRANCH_NAME_CLEAN) {
                     case ~/.*canary.*/:
-                        tagInfo = "🔥 카나리 태그(canary) 생성 완료 - 카나리 배포 준비됨!"
+                        tagInfo = "카나리 태그(canary) 생성 완료 - 카나리 배포 준비됨!"
                         deployInstructions = """
 === 카나리 배포 실행 방법 ===
 1. ECR 이미지 확인:
@@ -403,31 +370,35 @@ pipeline {
                         break
                     case "main":
                     case "master":
-                        tagInfo = "🚀 프로덕션 태그(latest) 생성 완료 - 프로덕션 배포 준비됨!"
+                        tagInfo = "프로덕션 태그(latest) 생성 완료 - 프로덕션 배포 준비됨!"
                         deployInstructions = """
 === 프로덕션 배포 실행 방법 ===
 1. 프로덕션 배포:
    kubectl set image deployment/auth-deployment -n app auth-container=061039771693.dkr.ecr.ap-northeast-2.amazonaws.com/peopleofdelivery/auth-service:latest
+   kubectl set image deployment/user-deployment -n app user-container=061039771693.dkr.ecr.ap-northeast-2.amazonaws.com/peopleofdelivery/user-service:latest
 
 2. 배포 확인:
    kubectl rollout status deployment/auth-deployment -n app
+   kubectl rollout status deployment/user-deployment -n app
                         """
                         break
                     case "develop":
                     case "dev":
-                        tagInfo = "🛠️ 개발 태그(dev) 생성 완료 - 개발환경 배포 준비됨!"
+                        tagInfo = "개발 태그(dev) 생성 완료 - 개발환경 배포 준비됨!"
                         deployInstructions = """
 === 개발환경 배포 실행 방법 ===
 1. 개발 배포:
    kubectl set image deployment/auth-deployment -n app auth-container=061039771693.dkr.ecr.ap-northeast-2.amazonaws.com/peopleofdelivery/auth-service:dev
+   kubectl set image deployment/user-deployment -n app user-container=061039771693.dkr.ecr.ap-northeast-2.amazonaws.com/peopleofdelivery/user-service:dev
                         """
                         break
                     default:
-                        tagInfo = "📦 기본 태그만 생성됨 - 피처 브랜치"
+                        tagInfo = "기본 태그만 생성됨 - 피처 브랜치"
                         deployInstructions = """
 === 피처 브랜치 테스트 배포 ===
 1. 특정 태그 배포:
    kubectl set image deployment/auth-deployment -n app auth-container=061039771693.dkr.ecr.ap-northeast-2.amazonaws.com/peopleofdelivery/auth-service:${env.IMAGE_TAG}
+   kubectl set image deployment/user-deployment -n app user-container=061039771693.dkr.ecr.ap-northeast-2.amazonaws.com/peopleofdelivery/user-service:${env.IMAGE_TAG}
                         """
                         break
                 }
@@ -437,19 +408,18 @@ pipeline {
                 
                 echo """
 === 빌드 완료 요약 ===
-✅ Module Common: 성공
-✅ Auth Service: 성공  
-✅ User Service: 성공
-🏷️  태그: ${env.IMAGE_TAG}
-🌿 브랜치: ${env.BRANCH_NAME_CLEAN}
-⏰ 완료 시간: ${new Date()}
+Auth Service: 성공  
+User Service: 성공
+태그: ${env.IMAGE_TAG}
+브랜치: ${env.BRANCH_NAME_CLEAN}
+완료 시간: ${new Date()}
                 """
             }
         }
         
         failure {
             script {
-                echo "❌ 순차 빌드 파이프라인 실패!"
+                echo "서비스 빌드 파이프라인 실패!"
                 echo "실패한 브랜치: ${env.BRANCH_NAME_CLEAN ?: 'unknown'}"
                 echo "시도한 태그: ${env.IMAGE_TAG ?: 'unknown'}"
                 
@@ -457,12 +427,10 @@ pipeline {
                     echo "=== 상세 실패 분석 ==="
                     
                     echo "1. 빌드 아티팩트 상태:"
-                    echo "   Module Common JAR:"
-                    find ./module-common/build -name "*.jar" 2>/dev/null || echo "   ❌ Module Common JAR 없음"
                     echo "   Auth Service JAR:"
-                    find ./auth-service/build -name "*.jar" 2>/dev/null || echo "   ❌ Auth Service JAR 없음"
+                    find ./auth-service/build -name "*.jar" 2>/dev/null || echo "   Auth Service JAR 없음"
                     echo "   User Service JAR:"
-                    find ./user-service/build -name "*.jar" 2>/dev/null || echo "   ❌ User Service JAR 없음"
+                    find ./user-service/build -name "*.jar" 2>/dev/null || echo "   User Service JAR 없음"
                     
                     echo ""
                     echo "2. Gradle 빌드 로그 확인:"
@@ -478,20 +446,20 @@ pipeline {
                     
                     echo ""
                     echo "4. Docker 이미지 상태:"
-                    docker images | grep -E "(module-common|auth-service|user-service)" | head -10 || echo "   Docker 이미지 없음"
+                    docker images | grep -E "(auth-service|user-service)" | head -10 || echo "   Docker 이미지 없음"
                     
                     echo ""
                     echo "=== 해결 방법 제안 ==="
-                    echo "1. QueryDSL 문제인 경우: Module Common을 먼저 완전히 빌드한 후 다른 서비스 빌드"
-                    echo "2. 의존성 문제인 경우: ./gradlew clean 후 재시도"
-                    echo "3. Docker 문제인 경우: Docker 데몬 재시작"
+                    echo "1. 의존성 문제인 경우: ./gradlew clean 후 재시도"
+                    echo "2. Docker 문제인 경우: Docker 데몬 재시작"
+                    echo "3. 개별 서비스 빌드 테스트: ./gradlew :auth-service:build -x test"
                 '''
             }
         }
         
         always {
             script {
-                echo "🔧 정리 작업 시작"
+                echo "정리 작업 시작"
                 sh '''
                     echo "=== 빌드 통계 ==="
                     echo "빌드 번호: ${BUILD_NUMBER}"
@@ -505,7 +473,7 @@ pipeline {
                     
                     # 빌드된 이미지 확인 (정리 전)
                     echo "빌드된 이미지들:"
-                    docker images | grep -E "(module-common|auth-service|user-service)" || echo "빌드된 이미지 없음"
+                    docker images | grep -E "(auth-service|user-service)" || echo "빌드된 이미지 없음"
                     
                     echo ""
                     echo "=== Gradle 정리 ==="
@@ -513,10 +481,11 @@ pipeline {
                     ./gradlew clean || true
                     
                     echo ""
-                    echo "✅ 정리 완료"
-                    echo "🏁 파이프라인 종료: $(date)"
+                    echo "정리 완료"
+                    echo "파이프라인 종료: $(date)"
                 '''
             }
         }
     }
 }
+
