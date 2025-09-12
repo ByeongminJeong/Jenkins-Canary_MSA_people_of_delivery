@@ -1,6 +1,10 @@
 pipeline {
     agent any
     
+    triggers {
+        pollSCM('H/2 * * * *')  // 2분마다 GitHub 변경사항 체크
+    }
+    
     environment {
         // Git 커밋 해시
         GIT_COMMIT_SHORT = sh(
@@ -258,7 +262,7 @@ pipeline {
                         /usr/local/bin/kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | \
                             /usr/local/bin/kubectl apply -f -
                         
-                        # sed를 사용한 환경변수 치환 함수 (카나리 이미지 태그 수정 포함)
+                        # sed를 사용한 환경변수 치환 함수 (개선된 버전)
                         substitute_vars() {
                             local input_file="$1"
                             local output_file="$2"
@@ -273,25 +277,27 @@ pipeline {
                             echo "sed로 환경변수 치환 중: $input_file -> $output_file"
                             echo "사용할 이미지 태그: ${ACTUAL_IMAGE_TAG}"
                             
-                            sed -e "s|\${ECR_REGISTRY}|${ECR_REGISTRY}|g" \
-                                -e "s|\${ECR_PREFIX}|${ECR_PREFIX}|g" \
-                                -e "s|\${IMAGE_TAG}|${ACTUAL_IMAGE_TAG}|g" \
-                                -e "s|\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \
-                                -e "s|\${AWS_REGION}|${AWS_REGION}|g" \
-                                -e "s|\${AWS_ACCOUNT_ID}|${AWS_ACCOUNT_ID}|g" \
-                                -e "s|\${DB_URL}|${DB_URL}|g" \
-                                -e "s|\${DB_USERNAME}|${DB_USERNAME}|g" \
-                                -e "s|\${DB_PASSWORD}|${DB_PASSWORD}|g" \
-                                -e "s|\${JWT_SECRET}|${JWT_SECRET}|g" \
-                                -e "s|\${JWT_REFRESH_SECRET}|${JWT_REFRESH_SECRET}|g" \
-                                -e "s|\${REDIS_HOST}|${REDIS_HOST}|g" \
-                                -e "s|\${REDIS_PORT}|${REDIS_PORT}|g" \
-                                -e "s|\${MAIL_USERNAME}|${MAIL_USERNAME}|g" \
-                                -e "s|\${MAIL_PASSWORD}|${MAIL_PASSWORD}|g" \
-                                -e "s|\${GOOGLE_CLIENT_ID}|${GOOGLE_CLIENT_ID}|g" \
-                                -e "s|\${GOOGLE_CLIENT_SECRET_ID}|${GOOGLE_CLIENT_SECRET_ID}|g" \
-                                -e "s|\${AUTH_SERVICE_PASSPORT_SECRET}|${AUTH_SERVICE_PASSPORT_SECRET}|g" \
-                                -e "s|\${USER_SERVICE_PASSPORT_SECRET}|${USER_SERVICE_PASSPORT_SECRET}|g" \
+                            # sed 구분자를 |로 변경하여 URL 특수문자 문제 해결
+                            sed \
+                                -e "s|\\\${ECR_REGISTRY}|${ECR_REGISTRY}|g" \
+                                -e "s|\\\${ECR_PREFIX}|${ECR_PREFIX}|g" \
+                                -e "s|\\\${IMAGE_TAG}|${ACTUAL_IMAGE_TAG}|g" \
+                                -e "s|\\\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \
+                                -e "s|\\\${AWS_REGION}|${AWS_REGION}|g" \
+                                -e "s|\\\${AWS_ACCOUNT_ID}|${AWS_ACCOUNT_ID}|g" \
+                                -e "s|\\\${DB_URL}|${DB_URL}|g" \
+                                -e "s|\\\${DB_USERNAME}|${DB_USERNAME}|g" \
+                                -e "s|\\\${DB_PASSWORD}|${DB_PASSWORD}|g" \
+                                -e "s|\\\${JWT_SECRET}|${JWT_SECRET}|g" \
+                                -e "s|\\\${JWT_REFRESH_SECRET}|${JWT_REFRESH_SECRET}|g" \
+                                -e "s|\\\${REDIS_HOST}|${REDIS_HOST}|g" \
+                                -e "s|\\\${REDIS_PORT}|${REDIS_PORT}|g" \
+                                -e "s|\\\${MAIL_USERNAME}|${MAIL_USERNAME}|g" \
+                                -e "s|\\\${MAIL_PASSWORD}|${MAIL_PASSWORD}|g" \
+                                -e "s|\\\${GOOGLE_CLIENT_ID}|${GOOGLE_CLIENT_ID}|g" \
+                                -e "s|\\\${GOOGLE_CLIENT_SECRET_ID}|${GOOGLE_CLIENT_SECRET_ID}|g" \
+                                -e "s|\\\${AUTH_SERVICE_PASSPORT_SECRET}|${AUTH_SERVICE_PASSPORT_SECRET}|g" \
+                                -e "s|\\\${USER_SERVICE_PASSPORT_SECRET}|${USER_SERVICE_PASSPORT_SECRET}|g" \
                                 "$input_file" > "$output_file"
 
                             echo "치환 완료: $(wc -l < "$output_file") 라인"
@@ -299,14 +305,15 @@ pipeline {
                             # 치환되지 않은 변수 확인
                             REMAINING_VARS=$(grep -o '\${[^}]*}' "$output_file" || true)
                             if [ -n "$REMAINING_VARS" ]; then
-                                echo "WARNING: 치환되지 않은 변수들: $REMAINING_VARS"
+                                echo "WARNING: 치환되지 않은 변수들:"
+                                echo "$REMAINING_VARS"
                             else
                                 echo "SUCCESS: 모든 환경변수 치환 완료"
                             fi
                             
                             # 이미지 태그 확인
                             echo "최종 이미지 확인:"
-                            grep "image:" "$output_file" | head -2
+                            grep "image:" "$output_file" | head -2 || echo "image 라인을 찾을 수 없음"
                         }
 
                         # 배포 전략별 처리
@@ -577,4 +584,3 @@ pipeline {
         }
     }
 }
-
