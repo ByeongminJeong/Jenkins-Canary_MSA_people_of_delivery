@@ -41,9 +41,6 @@ spec:
       canaryService: auth-service-canary
       stableService: auth-service-stable
       
-      # 라벨 자동 부착 제거 (서비스 selector 단순화)
-      
-      # 중복된 analysis 섹션 제거
       trafficRouting:
         alb:
           ingress: app-ingress
@@ -61,7 +58,6 @@ spec:
       labels:
         app: auth
         service: auth-service
-        # version 제거 - Argo Rollouts가 자동 관리
     spec:
       nodeSelector:
         eks.amazonaws.com/nodegroup: app-ng
@@ -81,85 +77,38 @@ spec:
           name: http
           protocol: TCP
 
-        env:
-        - name: SPRING_PROFILES_ACTIVE
-          value: "production"
-        - name: DEPLOYMENT_STRATEGY
-          value: "${DEPLOYMENT_STRATEGY}"
-        - name: PASSPORT_SECRET
-          value: "${PASSPORT_SECRET}"
-        # IMAGE_TAG 환경변수 제거 (불필요)
+        # ConfigMap과 Secret에서 환경변수 로드 (순서 중요!)
+        envFrom:
+        - configMapRef:
+            name: common-config           # 공통 설정 먼저
+        - secretRef:
+            name: common-secrets          # 공통 시크릿
+        - configMapRef:
+            name: auth-service-config     # Auth Service 전용 설정
+        - secretRef:
+            name: auth-service-secret     # Auth Service 전용 시크릿
 
-        # 데이터베이스 설정
-        - name: SPRING_DATASOURCE_URL
-          value: "${DB_URL}"
-        - name: SPRING_DATASOURCE_USERNAME
-          value: "${DB_USERNAME}"
-        - name: SPRING_DATASOURCE_PASSWORD
-          value: "${DB_PASSWORD}"
-
-        # JWT 설정
-        - name: JWT_SECRET
-          value: "${JWT_SECRET}"
-        - name: JWT_REFRESH_SECRET
-          value: "${JWT_REFRESH_SECRET}"
-        - name: JWT_EXPIRATION
-          value: "3600000"
-
-        # Redis 설정
-        - name: SPRING_REDIS_HOST
-          value: "${REDIS_HOST}"
-        - name: SPRING_REDIS_PORT
-          value: "${REDIS_PORT}"
-
-        # 이메일 설정
-        - name: SPRING_MAIL_USERNAME
-          value: "${MAIL_USERNAME}"
-        - name: SPRING_MAIL_PASSWORD
-          value: "${MAIL_PASSWORD}"
-
-        # Google OAuth 설정
-        - name: GOOGLE_CLIENT_ID
-          value: "${GOOGLE_CLIENT_ID}"
-        - name: GOOGLE_CLIENT_SECRET_ID
-          value: "${GOOGLE_CLIENT_SECRET_ID}"
-
-        # Auth Service 특화 설정
-        - name: AUTH_SERVICE_PASSPORT_SECRET
-          value: "${AUTH_SERVICE_PASSPORT_SECRET}"
-
-        # 서비스 발견
-        - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
-          value: "http://discovery-service:8761/eureka"
-
-        # 헬스체크
-        livenessProbe:
-          httpGet:
-            path: /actuator/health/liveness
-            port: 8015
-          initialDelaySeconds: 90
-          periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 3
-        
-        readinessProbe:
-          httpGet:
-            path: /actuator/health/readiness
-            port: 8015
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-          successThreshold: 1
-
+        # 헬스체크 (TCP로 변경하여 안정성 향상)
         startupProbe:
-          httpGet:
-            path: /actuator/health
+          tcpSocket:
             port: 8015
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 30
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          failureThreshold: 20
+
+        readinessProbe:
+          tcpSocket:
+            port: 8015
+          initialDelaySeconds: 150
+          periodSeconds: 30
+          failureThreshold: 3
+
+        livenessProbe:
+          tcpSocket:
+            port: 8015
+          initialDelaySeconds: 180
+          periodSeconds: 60
+          failureThreshold: 3
 
         resources:
           requests:

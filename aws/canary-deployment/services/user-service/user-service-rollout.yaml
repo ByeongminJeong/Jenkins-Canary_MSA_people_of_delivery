@@ -41,8 +41,6 @@ spec:
       canaryService: user-service-canary
       stableService: user-service-stable
       
-      # 라벨 자동 부착 제거 (서비스 selector 단순화)
-      
       trafficRouting:
         alb:
           ingress: app-ingress
@@ -60,7 +58,6 @@ spec:
       labels:
         app: user
         service: user-service
-        # version 제거 - Argo Rollouts가 자동 관리
     spec:
       nodeSelector:
         eks.amazonaws.com/nodegroup: app-ng
@@ -80,70 +77,38 @@ spec:
           name: http
           protocol: TCP
 
-        env:
-        - name: SPRING_PROFILES_ACTIVE
-          value: "production"
-        - name: DEPLOYMENT_STRATEGY
-          value: "${DEPLOYMENT_STRATEGY}"
-        - name: PASSPORT_SECRET
-          value: "${PASSPORT_SECRET}"
-        # IMAGE_TAG 환경변수 제거 (불필요)
+        # ConfigMap과 Secret에서 환경변수 로드
+        envFrom:
+        - configMapRef:
+            name: common-config           # 공통 설정
+        - secretRef:
+            name: common-secrets          # 공통 시크릿
+        - configMapRef:
+            name: user-service-config     # User Service 전용 설정
+        - secretRef:
+            name: user-service-secret     # User Service 전용 시크릿
 
-        # 나머지 환경변수들은 그대로...
-        - name: SPRING_DATASOURCE_URL
-          value: "${DB_URL}"
-        - name: SPRING_DATASOURCE_USERNAME
-          value: "${DB_USERNAME}"
-        - name: SPRING_DATASOURCE_PASSWORD
-          value: "${DB_PASSWORD}"
-        - name: JWT_SECRET
-          value: "${JWT_SECRET}"
-        - name: JWT_REFRESH_SECRET
-          value: "${JWT_REFRESH_SECRET}"
-        - name: SPRING_REDIS_HOST
-          value: "${REDIS_HOST}"
-        - name: SPRING_REDIS_PORT
-          value: "${REDIS_PORT}"
-        - name: SPRING_MAIL_USERNAME
-          value: "${MAIL_USERNAME}"
-        - name: SPRING_MAIL_PASSWORD
-          value: "${MAIL_PASSWORD}"
-        - name: GOOGLE_CLIENT_ID
-          value: "${GOOGLE_CLIENT_ID}"
-        - name: GOOGLE_CLIENT_SECRET_ID
-          value: "${GOOGLE_CLIENT_SECRET_ID}"
-        - name: USER_SERVICE_PASSPORT_SECRET
-          value: "${USER_SERVICE_PASSPORT_SECRET}"
-        - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
-          value: "http://discovery-service:8761/eureka"
-
-        # 헬스체크와 리소스는 그대로 완벽함
-        livenessProbe:
-          httpGet:
-            path: /actuator/health/liveness
+        # 헬스체크
+        startupProbe:
+          tcpSocket:
             port: 8014
-          initialDelaySeconds: 90
+          initialDelaySeconds: 120
           periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 3
+          failureThreshold: 20
 
         readinessProbe:
-          httpGet:
-            path: /actuator/health/readiness
+          tcpSocket:
             port: 8014
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
+          initialDelaySeconds: 150
+          periodSeconds: 30
           failureThreshold: 3
-        
-        startupProbe:
-          httpGet:
-            path: /actuator/health
+
+        livenessProbe:
+          tcpSocket:
             port: 8014
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 30
+          initialDelaySeconds: 180
+          periodSeconds: 60
+          failureThreshold: 3
 
         resources:
           requests:
