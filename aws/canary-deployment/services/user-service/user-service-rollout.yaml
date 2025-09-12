@@ -85,6 +85,8 @@ spec:
           value: "production"
         - name: DEPLOYMENT_STRATEGY
           value: "${DEPLOYMENT_STRATEGY}"
+        - name: PASSPORT_SECRET
+          value: "${PASSPORT_SECRET}"
         # IMAGE_TAG 환경변수 제거 (불필요)
 
         # 나머지 환경변수들은 그대로...

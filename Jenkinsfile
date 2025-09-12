@@ -296,8 +296,7 @@ pipeline {
                                 -e "s|\\\${MAIL_PASSWORD}|${MAIL_PASSWORD}|g" \
                                 -e "s|\\\${GOOGLE_CLIENT_ID}|${GOOGLE_CLIENT_ID}|g" \
                                 -e "s|\\\${GOOGLE_CLIENT_SECRET_ID}|${GOOGLE_CLIENT_SECRET_ID}|g" \
-                                -e "s|\\\${AUTH_SERVICE_PASSPORT_SECRET}|${AUTH_SERVICE_PASSPORT_SECRET}|g" \
-                                -e "s|\\\${USER_SERVICE_PASSPORT_SECRET}|${USER_SERVICE_PASSPORT_SECRET}|g" \
+                                -e "s|\\\${PASSPORT_SECRET}|${PASSPORT_SECRET}|g" \
                                 "$input_file" > "$output_file"
 
                             echo "치환 완료: $(wc -l < "$output_file") 라인"
