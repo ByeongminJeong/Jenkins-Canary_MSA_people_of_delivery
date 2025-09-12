@@ -13,7 +13,7 @@ pipeline {
         stage('Generate Tags') {
             steps {
                 script {
-                    // 브랜치명 정리 - main, dev, canary 전략에 맞게 수정
+                    // 브랜치명 정리 - cloud, main 전략에 맞게 수정
                     def branchNameClean = sh(
                         script: '''
                             echo "DEBUG - BRANCH_NAME: ${BRANCH_NAME:-empty}" >&2
@@ -33,19 +33,19 @@ pipeline {
                             # origin/ 프리픽스 제거 및 표준화
                             CLEAN_BRANCH=$(echo "$CURRENT_BRANCH" | sed 's|^origin/||' | sed 's|^refs/heads/||')
 
-                            # 브랜치명 표준화 - main, dev, canary만 허용
+                            # 브랜치명 표준화 - cloud, main만 주로 사용
                             case "$CLEAN_BRANCH" in
                                 main|master)
                                     echo "main"
                                     ;;
+                                cloud|cloud-deploy)
+                                    echo "cloud"
+                                    ;;
                                 dev|develop|development)
                                     echo "dev"
                                     ;;
-                                canary|jenkins-canary|*canary*)
-                                    echo "canary"
-                                    ;;
                                 *)
-                                    # feature 브랜치는 dev로 처리
+                                    # feature 브랜치는 cloud 기반으로 처리
                                     echo "feature-$(echo $CLEAN_BRANCH | sed 's/[^a-zA-Z0-9]/-/g')"
                                     ;;
                             esac
@@ -62,13 +62,13 @@ pipeline {
                             imageTag = "v${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
                             deploymentStrategy = "production"
                             break
+                        case 'cloud':
+                            imageTag = "canary-${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
+                            deploymentStrategy = "canary"
+                            break
                         case 'dev':
                             imageTag = "dev-${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
                             deploymentStrategy = "development"
-                            break
-                        case 'canary':
-                            imageTag = "canary-${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
-                            deploymentStrategy = "canary"
                             break
                         default:
                             imageTag = "${branchNameClean}-${env.GIT_COMMIT_SHORT}"
@@ -187,15 +187,15 @@ pipeline {
                                     docker push ${image_path}:latest
                                     docker push ${image_path}:stable
                                     ;;
-                                development)
-                                    echo "개발 배포 - dev 태그 추가"
-                                    docker tag ${image_path}:${IMAGE_TAG} ${image_path}:dev
-                                    docker push ${image_path}:dev
-                                    ;;
                                 canary)
                                     echo "카나리 배포 - canary 태그 추가"
                                     docker tag ${image_path}:${IMAGE_TAG} ${image_path}:canary
                                     docker push ${image_path}:canary
+                                    ;;
+                                development)
+                                    echo "개발 배포 - dev 태그 추가"
+                                    docker tag ${image_path}:${IMAGE_TAG} ${image_path}:dev
+                                    docker push ${image_path}:dev
                                     ;;
                                 feature)
                                     echo "피처 브랜치 - 기본 태그만"
@@ -241,13 +241,13 @@ pipeline {
                                 NAMESPACE="app"
                                 echo "프로덕션 네임스페이스: ${NAMESPACE}"
                                 ;;
+                            canary)
+                                NAMESPACE="app"
+                                echo "카나리 네임스페이스: ${NAMESPACE}"
+                                ;;
                             development)
                                 NAMESPACE="app-dev"
                                 echo "개발 네임스페이스: ${NAMESPACE}"
-                                ;;
-                            canary)
-                                NAMESPACE="app"
-                                echo "카나리 네임스페이스: ${NAMESPACE} (프로덕션과 동일)"
                                 ;;
                             feature)
                                 NAMESPACE="app-feature"
@@ -309,38 +309,43 @@ pipeline {
                             grep "image:" "$output_file" | head -2
                         }
 
-                        # 배포 전략별 처리 (수정된 경로: aws/canary-deployment/services/)
+                        # 배포 전략별 처리
                         case "${DEPLOYMENT_STRATEGY}" in
                             canary)
-                                echo "=== 카나리 배포 실행 ==="
+                                echo "=== 카나리 배포 실행 (cloud 브랜치) ==="
                                 cd aws/canary-deployment/services
 
-                                # 기존 Deployment가 있다면 삭제 (Rollout으로 교체)
-                                echo "기존 Deployment 확인 및 삭제..."
+                                # 1. Ingress 먼저 배포 (트래픽 라우팅 기반)
+                                echo "1. Ingress 배포 중..."
+                                if [ -f "../eks-app/ingress/app-ingress.yaml" ]; then
+                                    /usr/local/bin/kubectl apply -f ../eks-app/ingress/app-ingress.yaml -n ${NAMESPACE}
+                                    echo "Ingress 배포 완료"
+                                else
+                                    echo "WARNING: Ingress 파일을 찾을 수 없습니다"
+                                fi
+
+                                # 2. 기존 Deployment 삭제 (Rollout으로 교체)
+                                echo "2. 기존 Deployment 확인 및 삭제..."
                                 /usr/local/bin/kubectl delete deployment auth-deployment -n ${NAMESPACE} --ignore-not-found
                                 /usr/local/bin/kubectl delete deployment user-deployment -n ${NAMESPACE} --ignore-not-found
                                 
-                                # 환경변수 치환하여 임시 파일 생성
+                                # 3. 환경변수 치환하여 임시 파일 생성
+                                echo "3. 환경변수 치환..."
                                 mkdir -p /tmp/k8s
                                 substitute_vars auth-service/auth-service-rollout.yaml /tmp/k8s/auth-rollout.yaml
                                 substitute_vars user-service/user-service-rollout.yaml /tmp/k8s/user-rollout.yaml
 
-                                # Auth Service 카나리 배포
-                                echo "Auth Service 카나리 배포..."
+                                # 4. Auth Service 카나리 배포
+                                echo "4. Auth Service 카나리 배포..."
                                 /usr/local/bin/kubectl apply -f auth-service/auth-service-analysis.yaml -n ${NAMESPACE}
                                 /usr/local/bin/kubectl apply -f auth-service/auth-service-services.yaml -n ${NAMESPACE}
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/auth-rollout.yaml -n ${NAMESPACE}
 
-                                # User Service 카나리 배포  
-                                echo "User Service 카나리 배포..."
+                                # 5. User Service 카나리 배포  
+                                echo "5. User Service 카나리 배포..."
                                 /usr/local/bin/kubectl apply -f user-service/user-service-analysis.yaml -n ${NAMESPACE}
                                 /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n ${NAMESPACE}
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/user-rollout.yaml -n ${NAMESPACE}
-                                
-                                # 배포 상태 확인
-                                echo "=== 배포 상태 확인 ==="
-                                /usr/local/bin/kubectl get rollouts -n ${NAMESPACE}
-                                /usr/local/bin/kubectl get services -n ${NAMESPACE} | grep -E "(auth|user)-service"
 
                                 echo "카나리 배포 시작됨 - Argo Rollouts에서 자동 진행"
                                 echo "모니터링 명령어:"
@@ -351,8 +356,14 @@ pipeline {
                                 echo "  kubectl argo rollouts promote user-service-rollout -n ${NAMESPACE}"
                                 ;;
                             production)
-                                echo "=== 프로덕션 배포 ==="
+                                echo "=== 프로덕션 배포 (main 브랜치) ==="
                                 cd aws/canary-deployment/services
+
+                                # Ingress 배포
+                                echo "Ingress 배포 중..."
+                                if [ -f "../eks-app/ingress/app-ingress.yaml" ]; then
+                                    /usr/local/bin/kubectl apply -f ../eks-app/ingress/app-ingress.yaml -n ${NAMESPACE}
+                                fi
 
                                 # 프로덕션도 Rollouts 사용하여 안전한 배포
                                 mkdir -p /tmp/k8s
@@ -413,7 +424,7 @@ pipeline {
                 sh '''
                     case "${DEPLOYMENT_STRATEGY}" in
                         canary)
-                            echo "=== 카나리 배포 상태 확인 ==="
+                            echo "=== 카나리 배포 상태 확인 (cloud 브랜치) ==="
                             /usr/local/bin/kubectl get rollouts -n app || true
                             echo ""
                             echo "Auth Service Rollout 상태:"
@@ -421,10 +432,14 @@ pipeline {
                             echo ""
                             echo "User Service Rollout 상태:"
                             /usr/local/bin/kubectl argo rollouts get rollout user-service-rollout -n app || true
+                            echo ""
+                            echo "Ingress 상태:"
+                            /usr/local/bin/kubectl get ingress -n app || true
                             ;;
                         production)
-                            echo "=== 프로덕션 배포 상태 확인 ==="
+                            echo "=== 프로덕션 배포 상태 확인 (main 브랜치) ==="
                             /usr/local/bin/kubectl get all -n app || true
+                            /usr/local/bin/kubectl get ingress -n app || true
                             ;;
                         development)
                             echo "=== 개발환경 상태 확인 ==="
@@ -455,7 +470,7 @@ pipeline {
                 switch(env.DEPLOYMENT_STRATEGY) {
                     case 'canary':
                         message = """
-카나리 배포 시작됨!
+카나리 배포 시작됨! (cloud 브랜치)
 - 브랜치: ${env.BRANCH_NAME_CLEAN}
 - 이미지: canary 태그  
 - 단계: 10% → 25% → 50% → 100% 자동 진행
@@ -465,7 +480,7 @@ pipeline {
                         break
                     case 'production':
                         message = """
-프로덕션 배포 완료!
+프로덕션 배포 완료! (main 브랜치)
 - 브랜치: ${env.BRANCH_NAME_CLEAN}
 - 이미지: latest, stable 태그
 - 안정적인 프로덕션 서비스 배포됨

@@ -1,0 +1,44 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  namespace: app
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/success-codes: "200"
+    alb.ingress.kubernetes.io/group.name: app-ingress
+    alb.ingress.kubernetes.io/group.order: '1'
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          # Auth Service - Stable 서비스만 참조 (Rollout이 내부적으로 관리)
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service-stable
+                port:
+                  number: 80
+          
+          # User Service - Stable 서비스만 참조 (Rollout이 내부적으로 관리)
+          - path: /users
+            pathType: Prefix
+            backend:
+              service:
+                name: user-service-stable
+                port:
+                  number: 80
+          
+          # Module Common - 일반 서비스
+          - path: /common
+            pathType: Prefix
+            backend:
+              service:
+                name: module-common-service
+                port:
+                  number: 80
