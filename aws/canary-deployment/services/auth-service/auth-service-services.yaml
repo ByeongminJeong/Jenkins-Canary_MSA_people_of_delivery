@@ -7,12 +7,11 @@ metadata:
   namespace: app
   labels:
     app: auth
-    version: stable  # 추가
+    
 spec:
   selector:
     app: auth
     service: auth-service
-    version: stable
   ports:
   - name: http
     port: 80
@@ -28,12 +27,11 @@ metadata:
   namespace: app
   labels:
     app: auth
-    version: canary
+    
 spec:
   selector:
     app: auth
     service: auth-service
-    version: canary 
   ports:
   - name: http
     port: 80
@@ -49,12 +47,11 @@ metadata:
   namespace: app
   labels:
     app: auth
-    version: stable
+    
 spec:
   selector:
     app: auth
     service: auth-service
-    version: stable
   ports:
   - name: http
     port: 80

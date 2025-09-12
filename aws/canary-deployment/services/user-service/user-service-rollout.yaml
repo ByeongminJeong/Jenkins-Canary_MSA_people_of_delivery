@@ -41,13 +41,7 @@ spec:
       canaryService: user-service-canary
       stableService: user-service-stable
       
-      # 자동 라벨 관리
-      canaryMetadata:
-        labels:
-          version: canary
-      stableMetadata:
-        labels:
-          version: stable
+      # 라벨 자동 부착 제거 (서비스 selector 단순화)
       
       trafficRouting:
         alb:

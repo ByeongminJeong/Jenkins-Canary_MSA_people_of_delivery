@@ -41,12 +41,7 @@ spec:
       canaryService: auth-service-canary
       stableService: auth-service-stable
       
-      canaryMetadata:
-        labels:
-          version: canary
-      stableMetadata:
-        labels:
-          version: stable
+      # 라벨 자동 부착 제거 (서비스 selector 단순화)
       
       # 중복된 analysis 섹션 제거
       trafficRouting:
