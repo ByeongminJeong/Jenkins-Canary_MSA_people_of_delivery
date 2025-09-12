@@ -336,6 +336,11 @@ pipeline {
                                 /usr/local/bin/kubectl apply -f user-service/user-service-analysis.yaml -n ${NAMESPACE}
                                 /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n ${NAMESPACE}
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/user-rollout.yaml -n ${NAMESPACE}
+                                
+                                # 배포 상태 확인
+                                echo "=== 배포 상태 확인 ==="
+                                /usr/local/bin/kubectl get rollouts -n ${NAMESPACE}
+                                /usr/local/bin/kubectl get services -n ${NAMESPACE} | grep -E "(auth|user)-service"
 
                                 echo "카나리 배포 시작됨 - Argo Rollouts에서 자동 진행"
                                 echo "모니터링 명령어:"

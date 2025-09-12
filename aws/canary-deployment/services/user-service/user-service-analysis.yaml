@@ -37,7 +37,7 @@ spec:
                     sleep 1
                   done
                   
-                  success_rate=$(echo "scale=2; $success / $total" | bc)
+                  success_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
                   echo "User Service Success rate: $success_rate"
                   echo $success_rate
               restartPolicy: Never
@@ -72,7 +72,7 @@ spec:
                     sleep 1
                   done
                   
-                  api_rate=$(echo "scale=2; $success / $total" | bc)
+                  api_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
                   echo "User API validation rate: $api_rate"
                   echo $api_rate
               restartPolicy: Never

@@ -11,6 +11,7 @@ spec:
   selector:
     app: auth
     service: auth-service
+    version: stable
   ports:
   - name: http
     port: 80
@@ -30,6 +31,7 @@ spec:
   selector:
     app: auth
     service: auth-service
+    version: stable
   ports:
   - name: http
     port: 80
@@ -49,6 +51,7 @@ spec:
   selector:
     app: auth
     service: auth-service
+    version: stable
   ports:
   - name: http
     port: 80

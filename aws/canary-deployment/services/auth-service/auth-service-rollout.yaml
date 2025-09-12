@@ -50,6 +50,14 @@ spec:
       canaryService: auth-service-canary
       stableService: auth-service-stable
       
+      # 카나리/스테이블 라벨 자동 관리
+      canaryMetadata:
+        labels:
+          version: canary
+      stableMetadata:
+        labels:
+          version: stable
+      
       # 자동 롤백 설정 개선
       analysis:
         templates:
