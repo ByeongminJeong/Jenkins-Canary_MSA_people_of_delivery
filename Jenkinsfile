@@ -17,34 +17,29 @@ pipeline {
         stage('Generate Tags') {
             steps {
                 script {
-                    // 현재 브랜치 확인 (간단한 방법)
+                    // 현재 브랜치 확인
                     def currentBranch = env.GIT_BRANCH ?: env.BRANCH_NAME ?: 'unknown'
                     def branchNameClean = currentBranch.replaceAll('^origin/', '').replaceAll('^refs/heads/', '')
+                    
+                    echo "DEBUG - 원본 브랜치: ${currentBranch}"
+                    echo "DEBUG - 정리된 브랜치: ${branchNameClean}"
                     
                     // 이미지 태그 생성 전략
                     def imageTag
                     def deploymentStrategy
 
-                    switch(branchNameClean) {
-                        case 'main':
-                        case 'master':
-                            imageTag = "v$${env.BUILD_NUMBER}-$${env.GIT_COMMIT_SHORT}"
-                            deploymentStrategy = "production"
-                            break
-                        case 'cloud':
-                        case 'cloud-deploy':
-                            imageTag = "canary-$${env.BUILD_NUMBER}-$${env.GIT_COMMIT_SHORT}"
-                            deploymentStrategy = "canary"
-                            break
-                        case 'dev':
-                        case 'develop':
-                        case 'development':
-                            imageTag = "dev-$${env.BUILD_NUMBER}-$${env.GIT_COMMIT_SHORT}"
-                            deploymentStrategy = "development"
-                            break
-                        default:
-                            imageTag = "$${branchNameClean}-$${env.GIT_COMMIT_SHORT}"
-                            deploymentStrategy = "feature"
+                    if (branchNameClean in ['main', 'master']) {
+                        imageTag = "v${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
+                        deploymentStrategy = "production"
+                    } else if (branchNameClean in ['cloud', 'cloud-deploy']) {
+                        imageTag = "canary-${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
+                        deploymentStrategy = "canary"
+                    } else if (branchNameClean in ['dev', 'develop', 'development']) {
+                        imageTag = "dev-${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
+                        deploymentStrategy = "development"
+                    } else {
+                        imageTag = "${branchNameClean}-${env.GIT_COMMIT_SHORT}"
+                        deploymentStrategy = "feature"
                     }
 
                     // 환경변수 설정
