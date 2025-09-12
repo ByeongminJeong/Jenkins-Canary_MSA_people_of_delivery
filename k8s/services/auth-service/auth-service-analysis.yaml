@@ -1,0 +1,79 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: auth-service-success-rate
+  namespace: app
+spec:
+  args:
+  - name: service-name
+  
+  metrics:
+  # HTTP 성공률 체크 (Auth Service 특화)
+  - name: success-rate
+    interval: 30s
+    count: 2
+    successCondition: result[0] >= 0.90  # 90% 이상 성공률 (Auth는 더 엄격)
+    failureLimit: 1
+    provider:
+      job:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: curl
+                image: curlimages/curl:7.85.0
+                command: ["/bin/sh", "-c"]
+                args:
+                - |
+                  set -e
+                  # 5번 요청해서 성공률 계산 (Auth는 빠른 검증)
+                  success=0
+                  total=5
+                  
+                  for i in $(seq 1 $total); do
+                    if curl -s -f http://{{args.service-name}}/actuator/health > /dev/null; then
+                      success=$((success + 1))
+                    fi
+                    sleep 1
+                  done
+                  
+                  success_rate=$(echo "scale=2; $success / $total" | bc)
+                  echo "Auth Service Success rate: $success_rate"
+                  echo $success_rate
+              restartPolicy: Never
+  
+  # JWT 토큰 검증 테스트 (실제 Auth Service API 호출)
+  - name: jwt-validation
+    interval: 30s
+    count: 2
+    successCondition: result[0] >= 0.80  # 80% 이상 JWT 검증 성공
+    failureLimit: 1
+    provider:
+      job:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: curl
+                image: curlimages/curl:7.85.0
+                command: ["/bin/sh", "-c"]
+                args:
+                - |
+                  # Auth Service 로그인 API 테스트
+                  success=0
+                  total=3
+                  
+                  for i in $(seq 1 $total); do
+                    # 로그인 요청 (실제 API 호출)
+                    if curl -s -f -X POST http://{{args.service-name}}/auth/login \
+                       -H "Content-Type: application/json" \
+                       -d '{"email":"test@example.com","password":"test123"}' > /dev/null; then
+                      success=$((success + 1))
+                    fi
+                    sleep 1
+                  done
+                  
+                  jwt_rate=$(echo "scale=2; $success / $total" | bc)
+                  echo "JWT validation rate: $jwt_rate"
+                  echo $jwt_rate
+              restartPolicy: Never

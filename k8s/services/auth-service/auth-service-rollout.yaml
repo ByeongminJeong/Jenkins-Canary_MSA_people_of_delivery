@@ -1,0 +1,204 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: auth-service-rollout
+  namespace: app
+  labels:
+    app: auth
+spec:
+  replicas: 1
+  
+  # 카나리 배포 전략 (기업 표준 비율 - 보안 서비스는 보수적)
+  strategy:
+    canary:
+      steps:
+      - setWeight: 5         # 1단계: 5% 트래픽 (초기 검증)
+      - pause: {duration: 60s}  # 1분 대기
+      
+      - analysis:            # 2단계: 자동 분석
+          templates:
+          - templateName: auth-service-success-rate
+          args:
+          - name: service-name
+            value: auth-service
+      
+      - setWeight: 10        # 3단계: 10% 트래픽 (기능 검증)
+      - pause: {duration: 90s}  # 1.5분 대기
+      
+      - analysis:            # 4단계: 재분석
+          templates:
+          - templateName: auth-service-success-rate
+          args:
+          - name: service-name
+            value: auth-service
+      
+      - setWeight: 20        # 5단계: 20% 트래픽 (성능 검증)
+      - pause: {duration: 120s}  # 2분 대기
+      
+      - setWeight: 50        # 6단계: 50% 트래픽 (안정성 검증)
+      - pause: {duration: 180s}  # 3분 대기
+      
+      - analysis:            # 7단계: 최종 분석
+          templates:
+          - templateName: auth-service-success-rate
+          args:
+          - name: service-name
+            value: auth-service
+      
+      - setWeight: 100       # 8단계: 100% 트래픽 (완전 전환)
+      
+      # 서비스 설정
+      canaryService: auth-service-canary
+      stableService: auth-service-stable
+      
+      # 트래픽 라우팅 (ALB Weighted Target Groups 자동 처리)
+      # ALB Ingress Controller가 stable/canary 서비스를 자동으로 감지하여 트래픽 분할
+  
+  # 롤백 시점 설정
+  revisionHistoryLimit: 5
+  
+  # 파드 템플릿
+  selector:
+    matchLabels:
+      app: auth
+  
+  template:
+    metadata:
+      labels:
+        app: auth
+        version: "v1.0.0"
+    spec:
+      # Node Selector & Tolerations (기존 Deployment와 동일)
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: app-ng   # app-ng 노드 그룹에만 배포
+      tolerations:
+        - key: "app"                          # app=true taint 허용
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+      
+      containers:
+      - name: auth-service
+        image: ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:${IMAGE_TAG}
+        ports:
+        - containerPort: 8015
+          name: http
+        
+        # 환경변수 설정 - Jenkins 파이프라인과 일치하도록 수정
+        env:
+        # 데이터베이스 설정
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: db-url
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: db-username
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: db-password
+
+        # Redis 설정
+        - name: SPRING_DATA_REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: redis-host
+        - name: SPRING_DATA_REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: redis-port
+
+        # JWT 설정
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: jwt-secret
+        - name: JWT_REFRESH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: jwt-refresh-secret
+
+        # Google OAuth 설정
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: google-client-id
+        - name: GOOGLE_CLIENT_SECRET_ID
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: google-client-secret-id
+
+        # 메일 설정
+        - name: MAIL_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: mail-username
+        - name: MAIL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: mail-password
+
+        # 서비스 포트 설정
+        - name: SERVER_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: service-port
+
+        # Passport Secret
+        - name: PASSPORT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: passport-secret
+
+        # 리소스 제한 (Spring Boot에 적합하게 증가)
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+
+        # 헬스체크
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8015
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8015
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # 시작 프로브 (Spring Boot 시작 시간 고려하여 연장)
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8015
+          initialDelaySeconds: 60  # 1분으로 연장
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 20     # 최대 5분 대기 (15초 * 20회)

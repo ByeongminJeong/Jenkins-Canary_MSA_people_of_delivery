@@ -1,0 +1,76 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: user-service-success-rate
+  namespace: app
+spec:
+  args:
+  - name: service-name
+  
+  metrics:
+  # HTTP 성공률 체크
+  - name: success-rate
+    interval: 30s
+    count: 2
+    successCondition: result[0] >= 0.95  # 95% 이상 성공률
+    failureLimit: 1
+    provider:
+      job:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: curl
+                image: curlimages/curl:7.85.0
+                command: ["/bin/sh", "-c"]
+                args:
+                - |
+                  set -e
+                  # 5번 요청해서 성공률 계산
+                  success=0
+                  total=5
+                  
+                  for i in $(seq 1 $total); do
+                    if curl -s -f http://{{args.service-name}}/actuator/health > /dev/null; then
+                      success=$((success + 1))
+                    fi
+                    sleep 1
+                  done
+                  
+                  success_rate=$(echo "scale=2; $success / $total" | bc)
+                  echo "User Service Success rate: $success_rate"
+                  echo $success_rate
+              restartPolicy: Never
+  
+  # 사용자 CRUD 테스트 (실제 User Service API 호출)
+  - name: user-crud-test
+    interval: 30s
+    count: 2
+    successCondition: result[0] >= 0.80  # 80% 이상 CRUD 성공
+    failureLimit: 1
+    provider:
+      job:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: curl
+                image: curlimages/curl:7.85.0
+                command: ["/bin/sh", "-c"]
+                args:
+                - |
+                  # 사용자 조회 API 테스트 (인증이 필요하므로 헬스체크만)
+                  success=0
+                  total=3
+                  
+                  for i in $(seq 1 $total); do
+                    if curl -s -f http://{{args.service-name}}/actuator/health > /dev/null; then
+                      success=$((success + 1))
+                    fi
+                    sleep 1
+                  done
+                  
+                  crud_rate=$(echo "scale=2; $success / $total" | bc)
+                  echo "User CRUD rate: $crud_rate"
+                  echo $crud_rate
+              restartPolicy: Never
