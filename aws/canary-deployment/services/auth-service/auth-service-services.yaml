@@ -7,6 +7,7 @@ metadata:
   namespace: app
   labels:
     app: auth
+    version: stable  # 추가
 spec:
   selector:
     app: auth
@@ -15,7 +16,7 @@ spec:
   ports:
   - name: http
     port: 80
-    targetPort: 8015  # 정확한 포트!
+    targetPort: 8015
   type: ClusterIP
 
 ---
@@ -27,15 +28,16 @@ metadata:
   namespace: app
   labels:
     app: auth
+    version: canary
 spec:
   selector:
     app: auth
     service: auth-service
-    version: stable
+    version: canary 
   ports:
   - name: http
     port: 80
-    targetPort: 8015  # 정확한 포트!
+    targetPort: 8015
   type: ClusterIP
 
 ---
@@ -47,6 +49,7 @@ metadata:
   namespace: app
   labels:
     app: auth
+    version: stable
 spec:
   selector:
     app: auth
@@ -55,5 +58,5 @@ spec:
   ports:
   - name: http
     port: 80
-    targetPort: 8015  # 정확한 포트!
+    targetPort: 8015
   type: ClusterIP

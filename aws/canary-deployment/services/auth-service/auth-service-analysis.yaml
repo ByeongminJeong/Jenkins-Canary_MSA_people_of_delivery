@@ -31,7 +31,7 @@ spec:
                   total=5
                   
                   for i in $(seq 1 $total); do
-                    if curl -s -f http://{{args.service-name}}/actuator/health > /dev/null; then
+                    if curl -s -f http://{{args.service-name}}:80/actuator/health > /dev/null; then
                       success=$((success + 1))
                     fi
                     sleep 1
@@ -65,8 +65,8 @@ spec:
                   
                   for i in $(seq 1 $total); do
                     # 헬스체크와 기본 API 응답 확인
-                    if curl -s -f http://{{args.service-name}}/actuator/health > /dev/null && \
-                       curl -s -f http://{{args.service-name}}/actuator/info > /dev/null; then
+                    if curl -s -f http://{{args.service-name}}:80/actuator/health > /dev/null && \
+                       curl -s -f http://{{args.service-name}}:80/actuator/info > /dev/null; then
                       success=$((success + 1))
                     fi
                     sleep 1

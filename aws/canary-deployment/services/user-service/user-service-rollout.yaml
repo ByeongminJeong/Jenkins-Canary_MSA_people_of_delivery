@@ -7,49 +7,41 @@ metadata:
     app: user
     service: user-service
 spec:
-  replicas: 3  # 프로덕션 안정성을 위해 증가
+  replicas: 3
 
-  # 카나리 배포 전략 개선 - main, dev, canary 브랜치별 최적화
   strategy:
     canary:
       steps:
-      - setWeight: 10        # 1단계: 10% (빠른 초기 검증)
+      - setWeight: 10
       - pause: {duration: 30s}
-
-      - analysis:            # 2단계: 초기 분석
+      - analysis:
           templates:
           - templateName: user-service-success-rate
           args:
           - name: service-name
             value: user-service
-      
-      - setWeight: 25        # 3단계: 25% (중간 검증)
+      - setWeight: 25
       - pause: {duration: 60s}
-
-      - analysis:            # 4단계: 중간 분석
+      - analysis:
           templates:
           - templateName: user-service-success-rate
           args:
           - name: service-name
             value: user-service
-      
-      - setWeight: 50        # 5단계: 50% (충분한 검증)
+      - setWeight: 50
       - pause: {duration: 120s}
-
-      - analysis:            # 6단계: 최종 분석
+      - analysis:
           templates:
           - templateName: user-service-success-rate
           args:
           - name: service-name
             value: user-service
-      
-      - setWeight: 100       # 7단계: 100% (완전 전환)
+      - setWeight: 100
 
-      # 서비스 설정
       canaryService: user-service-canary
       stableService: user-service-stable
       
-      # 카나리/스테이블 라벨 자동 관리
+      # 자동 라벨 관리
       canaryMetadata:
         labels:
           version: canary
@@ -57,7 +49,6 @@ spec:
         labels:
           version: stable
       
-      # 트래픽 관리
       trafficRouting:
         alb:
           ingress: app-ingress
@@ -75,7 +66,7 @@ spec:
       labels:
         app: user
         service: user-service
-        version: "${IMAGE_TAG}"
+        # version 제거 - Argo Rollouts가 자동 관리
     spec:
       nodeSelector:
         eks.amazonaws.com/nodegroup: app-ng
@@ -95,56 +86,42 @@ spec:
           name: http
           protocol: TCP
 
-        # 환경변수
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: "production"
         - name: DEPLOYMENT_STRATEGY
           value: "${DEPLOYMENT_STRATEGY}"
-        - name: IMAGE_TAG
-          value: "${IMAGE_TAG}"
+        # IMAGE_TAG 환경변수 제거 (불필요)
 
-        # 데이터베이스 설정 (Jenkins 환경변수에서 직접 주입)
+        # 나머지 환경변수들은 그대로...
         - name: SPRING_DATASOURCE_URL
           value: "${DB_URL}"
         - name: SPRING_DATASOURCE_USERNAME
           value: "${DB_USERNAME}"
         - name: SPRING_DATASOURCE_PASSWORD
           value: "${DB_PASSWORD}"
-
-        # JWT 설정
         - name: JWT_SECRET
           value: "${JWT_SECRET}"
         - name: JWT_REFRESH_SECRET
           value: "${JWT_REFRESH_SECRET}"
-
-        # Redis 설정
         - name: SPRING_REDIS_HOST
           value: "${REDIS_HOST}"
         - name: SPRING_REDIS_PORT
           value: "${REDIS_PORT}"
-
-        # 이메일 설정
         - name: SPRING_MAIL_USERNAME
           value: "${MAIL_USERNAME}"
         - name: SPRING_MAIL_PASSWORD
           value: "${MAIL_PASSWORD}"
-
-        # Google OAuth 설정
         - name: GOOGLE_CLIENT_ID
           value: "${GOOGLE_CLIENT_ID}"
         - name: GOOGLE_CLIENT_SECRET_ID
           value: "${GOOGLE_CLIENT_SECRET_ID}"
-
-        # User Service 특화 설정
         - name: USER_SERVICE_PASSPORT_SECRET
           value: "${USER_SERVICE_PASSPORT_SECRET}"
-
-        # 서비스 발견
         - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
           value: "http://discovery-service:8761/eureka"
 
-        # 헬스체크
+        # 헬스체크와 리소스는 그대로 완벽함
         livenessProbe:
           httpGet:
             path: /actuator/health/liveness
@@ -172,7 +149,6 @@ spec:
           timeoutSeconds: 5
           failureThreshold: 30
 
-        # 리소스 관리
         resources:
           requests:
             cpu: "200m"
@@ -181,7 +157,6 @@ spec:
             cpu: "1000m"
             memory: "1Gi"
 
-        # 보안 설정
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true

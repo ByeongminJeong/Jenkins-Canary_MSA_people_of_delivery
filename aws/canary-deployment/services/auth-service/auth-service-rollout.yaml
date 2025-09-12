@@ -9,48 +9,38 @@ metadata:
 spec:
   replicas: 1
 
-  # 카나리 배포 전략 개선 - main, dev, canary 브랜치별 최적화
   strategy:
     canary:
-      # 브랜치별 단계 조정
       steps:
-      - setWeight: 10        # 1단계: 10% (빠른 초기 검증)
+      - setWeight: 10
       - pause: {duration: 30s}
-
-      - analysis:            # 2단계: 초기 분석
+      - analysis:
           templates:
           - templateName: auth-service-success-rate
           args:
           - name: service-name
             value: auth-service
-      
-      - setWeight: 25        # 3단계: 25% (중간 검증)
+      - setWeight: 25
       - pause: {duration: 60s}
-
-      - analysis:            # 4단계: ��간 분석
+      - analysis:
           templates:
           - templateName: auth-service-success-rate
           args:
           - name: service-name
             value: auth-service
-      
-      - setWeight: 50        # 5단계: 50% (충분한 검증)
+      - setWeight: 50
       - pause: {duration: 120s}
-
-      - analysis:            # 6단계: 최종 분석
+      - analysis:
           templates:
           - templateName: auth-service-success-rate
           args:
           - name: service-name
             value: auth-service
-      
-      - setWeight: 100       # 7단계: 100% (완전 전환)
+      - setWeight: 100
 
-      # 서비스 설정 - 명확한 라벨링
       canaryService: auth-service-canary
       stableService: auth-service-stable
       
-      # 카나리/스테이블 라벨 자동 관리
       canaryMetadata:
         labels:
           version: canary
@@ -58,25 +48,14 @@ spec:
         labels:
           version: stable
       
-      # 자동 롤백 설정 개선
-      analysis:
-        templates:
-        - templateName: auth-service-success-rate
-        args:
-        - name: service-name
-          value: auth-service
-
-      # 트래픽 관리 - ALB/Ingress와 연동
+      # 중복된 analysis 섹션 제거
       trafficRouting:
-        # ALB Ingress를 통한 가중치 기반 라우팅
         alb:
           ingress: app-ingress
           servicePort: 80
 
-  # 롤백 설정
   revisionHistoryLimit: 10
 
-  # 선택자
   selector:
     matchLabels:
       app: auth
@@ -87,9 +66,8 @@ spec:
       labels:
         app: auth
         service: auth-service
-        version: "${IMAGE_TAG}"  # Jenkins에서 동적 치환
+        # version 제거 - Argo Rollouts가 자동 관리
     spec:
-      # 배포 최적화
       nodeSelector:
         eks.amazonaws.com/nodegroup: app-ng
       tolerations:
@@ -98,7 +76,6 @@ spec:
           value: "true"
           effect: "NoSchedule"
       
-      # 안전한 배포를 위한 설정
       terminationGracePeriodSeconds: 30
 
       containers:
@@ -109,16 +86,14 @@ spec:
           name: http
           protocol: TCP
 
-        # 환경변수 - 브랜치별 설정 지원
         env:
         - name: SPRING_PROFILES_ACTIVE
-          value: "production"  # 기본값, ConfigMap으로 오버라이드 가능
+          value: "production"
         - name: DEPLOYMENT_STRATEGY
           value: "${DEPLOYMENT_STRATEGY}"
-        - name: IMAGE_TAG
-          value: "${IMAGE_TAG}"
+        # IMAGE_TAG 환경변수 제거 (불필요)
 
-        # 데이터베이스 설정 (Jenkins 환경변수에서 직접 주입)
+        # 데이터베이스 설정
         - name: SPRING_DATASOURCE_URL
           value: "${DB_URL}"
         - name: SPRING_DATASOURCE_USERNAME
@@ -160,7 +135,7 @@ spec:
         - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
           value: "http://discovery-service:8761/eureka"
 
-        # 헬스체크 개선
+        # 헬스체크
         livenessProbe:
           httpGet:
             path: /actuator/health/liveness
@@ -180,7 +155,6 @@ spec:
           failureThreshold: 3
           successThreshold: 1
 
-        # 스타트업 프로브 추가 (Spring Boot 느린 시작 대응)
         startupProbe:
           httpGet:
             path: /actuator/health
@@ -188,9 +162,8 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 5
-          failureThreshold: 30  # 최대 5분 대기
+          failureThreshold: 30
 
-        # 리소스 관리
         resources:
           requests:
             cpu: "200m"
@@ -199,7 +172,6 @@ spec:
             cpu: "1000m"
             memory: "1Gi"
 
-        # 보안 설정
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
@@ -209,21 +181,18 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
 
-        # 임시 디렉토리 마운트
         volumeMounts:
         - name: tmp-volume
           mountPath: /tmp
         - name: logs-volume
           mountPath: /app/logs
 
-      # 볼륨 설정
       volumes:
       - name: tmp-volume
         emptyDir: {}
       - name: logs-volume
         emptyDir: {}
 
-      # 파드 보안 정책
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
