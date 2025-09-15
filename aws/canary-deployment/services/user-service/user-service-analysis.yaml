@@ -5,99 +5,99 @@ metadata:
   namespace: app
 spec:
   args:
-  - name: service-name
+    - name: service-name
   
   metrics:
-  # HTTP 성공률 체크
-  - name: success-rate
-    interval: 30s
-    count: 3
-    successCondition: result[0] >= 0.95  # 95% 이상 성공률
-    failureLimit: 1
-    provider:
-      job:
-        spec:
-          template:
-            spec:
-              containers:
-              - name: curl
-                image: curlimages/curl:7.85.0
-                command: ["/bin/sh", "-c"]
-                args:
-                - |
-                  set -e
-                  echo "Testing User Service: {{args.service-name}}"
-                  
-                  # 헬스체크 엔드포인트 테스트
-                  success=0
-                  total=10
-                  
-                  for i in $(seq 1 $total); do
-                    echo "Test $i/$total"
-                    if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/health > /dev/null 2>&1; then
-                      success=$((success + 1))
-                      echo "  ✓ Success"
-                    else
-                      echo "  ✗ Failed"
-                    fi
-                    sleep 2
-                  done
-                  
-                  success_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
-                  echo "User Service Success rate: $success_rate ($success/$total)"
-                  echo $success_rate
-              restartPolicy: Never
-              backoffLimit: 0
+    # HTTP 성공률 체크
+    - name: success-rate
+      interval: 30s
+      count: 3
+      successCondition: result[0] >= 0.95  # 95% 이상 성공률
+      failureLimit: 1
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                containers:
+                  - name: curl
+                    image: curlimages/curl:7.85.0
+                    command: ["/bin/sh", "-c"]
+                    args:
+                      - |
+                        set -e
+                        echo "Testing User Service: {{args.service-name}}"
+                        
+                        # 헬스체크 엔드포인트 테스트
+                        success=0
+                        total=10
+                        
+                        for i in $(seq 1 $total); do
+                          echo "Test $i/$total"
+                          if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/health > /dev/null 2>&1; then
+                            success=$((success + 1))
+                            echo "  ✓ Success"
+                          else
+                            echo "  ✗ Failed"
+                          fi
+                          sleep 2
+                        done
+                        
+                        success_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
+                        echo "User Service Success rate: $success_rate ($success/$total)"
+                        echo $success_rate
+                restartPolicy: Never
 
-  # 사용자 API 테스트 (User Service 특화)
-  - name: user-api-test
-    interval: 45s
-    count: 2
-    successCondition: result[0] >= 0.80  # 80% 이상 API 검증 성공
-    failureLimit: 1
-    provider:
-      job:
-        spec:
-          template:
-            spec:
-              containers:
-              - name: curl
-                image: curlimages/curl:7.85.0
-                command: ["/bin/sh", "-c"]
-                args:
-                - |
-                  echo "API Validation for User Service: {{args.service-name}}"
-                  
-                  success=0
-                  total=5
-                  
-                  for i in $(seq 1 $total); do
-                    echo "API Test $i/$total"
-                    
-                    # 여러 엔드포인트 테스트
-                    health_ok=false
-                    info_ok=false
-                    
-                    if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/health > /dev/null 2>&1; then
-                      health_ok=true
-                    fi
-                    
-                    if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/info > /dev/null 2>&1; then
-                      info_ok=true
-                    fi
-                    
-                    if [ "$health_ok" = true ] && [ "$info_ok" = true ]; then
-                      success=$((success + 1))
-                      echo "  ✓ All endpoints OK"
-                    else
-                      echo "  ✗ Some endpoints failed (health: $health_ok, info: $info_ok)"
-                    fi
-                    
-                    sleep 3
-                  done
-                  
-                  api_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
-                  echo "User API validation rate: $api_rate ($success/$total)"
-                  echo $api_rate
-              restartPolicy: Never
-              backoffLimit: 0
+    # 사용자 API 테스트 (User Service 특화)
+    - name: user-api-test
+      interval: 45s
+      count: 2
+      successCondition: result[0] >= 0.80  # 80% 이상 API 검증 성공
+      failureLimit: 1
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                containers:
+                  - name: curl
+                    image: curlimages/curl:7.85.0
+                    command: ["/bin/sh", "-c"]
+                    args:
+                      - |
+                        echo "API Validation for User Service: {{args.service-name}}"
+                        
+                        success=0
+                        total=5
+                        
+                        for i in $(seq 1 $total); do
+                          echo "API Test $i/$total"
+                        
+                          # 여러 엔드포인트 테스트
+                          health_ok=false
+                          info_ok=false
+                        
+                          if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/health > /dev/null 2>&1; then
+                            health_ok=true
+                          fi
+                        
+                          if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/info > /dev/null 2>&1; then
+                            info_ok=true
+                          fi
+                        
+                          if [ "$health_ok" = true ] && [ "$info_ok" = true ]; then
+                            success=$((success + 1))
+                            echo "  ✓ All endpoints OK"
+                          else
+                            echo "  ✗ Some endpoints failed (health: $health_ok, info: $info_ok)"
+                          fi
+                        
+                          sleep 3
+                        done
+                        
+                        api_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
+                        echo "User API validation rate: $api_rate ($success/$total)"
+                        echo $api_rate
+                restartPolicy: Never
