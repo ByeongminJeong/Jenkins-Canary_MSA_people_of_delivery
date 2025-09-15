@@ -1,5 +1,12 @@
 server:
   port: 8015
+
+logging:
+  level:
+    org.springframework.cloud.gateway: WARN
+    reactor.netty: WARN
+    root: WARN
+
 management:
   endpoints:
     web:
@@ -32,6 +39,16 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 2
+      idle-timeout: 300000        # 5m
+      max-lifetime: 1500000       # 25m
+      keepalive-time: 1200000     # 20m
+      connection-timeout: 30000
+      validation-timeout: 3000
+      auto-commit: false
+
   cloud:
     config:
       enabled: false
@@ -66,3 +83,22 @@ jwt:
   jwks:
     enabled: true
     key-id: auth-key-1
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        failureRateThreshold: 50
+        slowCallRateThreshold: 80
+        slowCallDurationThreshold: 10s
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        maxWaitDurationInHalfOpenState: 0
+        waitDurationInOpenState: 10s
+    instances:
+      reservation-service-circuit-breaker:
+        base-config: default
+      user-service:
+        base-config: default

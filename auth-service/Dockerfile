@@ -15,3 +15,5 @@ FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 COPY --from=builder /app/auth-service/build/libs/*.jar app.jar
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+
+

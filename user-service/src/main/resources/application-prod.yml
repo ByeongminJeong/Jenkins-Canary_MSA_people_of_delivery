@@ -1,5 +1,6 @@
 server:
   port: 8014
+
 management:
   endpoints:
     web:
@@ -17,10 +18,15 @@ management:
     redis:
       enabled: false
 
+logging:
+  level:
+    org.springframework.cloud.gateway: WARN
+    reactor.netty: WARN
+    root: WARN
+
 spring:
   application:
     name: user-service
-
   jpa:
     hibernate.ddl-auto: update
     show-sql: true
@@ -34,6 +40,16 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 2
+      idle-timeout: 300000        # 5m
+      max-lifetime: 1500000       # 25m
+      keepalive-time: 1200000     # 20m
+      connection-timeout: 30000
+      validation-timeout: 3000
+      auto-commit: false
+
   cloud:
     config:
       enabled: false
