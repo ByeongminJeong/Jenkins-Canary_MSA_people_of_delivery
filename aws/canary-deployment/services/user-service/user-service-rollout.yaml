@@ -105,7 +105,7 @@ spec:
 
         readinessProbe:
           httpGet:
-            path: /actuator/health/readiness
+            path: /actuator/health  # readiness에서 일반 health로 변경
             port: 8014
           initialDelaySeconds: 30
           periodSeconds: 5
@@ -113,7 +113,7 @@ spec:
 
         livenessProbe:
           httpGet:
-            path: /actuator/health/liveness
+            path: /actuator/health  # liveness에서 일반 health로 변경
             port: 8014
           initialDelaySeconds: 90
           periodSeconds: 30
