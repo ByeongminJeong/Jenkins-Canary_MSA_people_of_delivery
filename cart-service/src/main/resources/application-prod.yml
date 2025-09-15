@@ -1,6 +1,12 @@
 server:
   port: 8012
 
+logging:
+  level:
+    org.springframework.cloud.gateway: WARN
+    reactor.netty: WARN
+    root: WARN
+
 management:
   endpoints:
     web:
@@ -33,29 +39,91 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 2
+      idle-timeout: 300000        # 5m
+      max-lifetime: 1500000       # 25m
+      keepalive-time: 1200000     # 20m
+      connection-timeout: 30000
+      validation-timeout: 3000
+      auto-commit: false
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 1800000
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+          max-wait: -1ms
+
   cloud:
     config:
       enabled: false
 
-kafka:
-  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-  producer:
-    key-serializer: org.apache.kafka.common.serialization.StringSerializer
-    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-    acks: all
-    retries: 3
-    batch-size: 16384
-    linger-ms: 10
-    buffer-memory: 33554432
-  consumer:
-    group-id: order-service-group
-    auto-offset-reset: earliest
-    key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-    value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-    enable-auto-commit: false
-    properties:
-      spring.json.trusted.packages: "com.example.cloudfour.paymentservice.domain.payment.event,com.example.cloudfour.cartservice.event"
-  topic:
-    order-events: order-events
-    payment-events: payment-events
+    springdoc:
+      api-docs:
+        version: openapi_3_1
+        enabled: true
+      enable-spring-security: true
+      default-consumes-media-type: application/json
+      default-produces-media-type: application/json
 
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: order-service-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+kafka:
+  topics:
+    orderEvents: order.events.v1
+    orderCommands: order.commands.v1
+    paymentEvents: payment.events.v1
+
+    orderCommandsDLQ: order.commands.dlq.v1
+
+app:
+  eventPublishEnabled: ${EVENT_PUBLISH_ENABLED:true}
+  outbox:
+    enabled: true
+  saga:
+    enabled: true
+
+
+order:
+  timeout:
+    minutes: 0.17  # 주문 타임아웃 시간 (분) - 10초(테스트용) 실제로는 10분
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        failureRateThreshold: 50
+        slowCallRateThreshold: 80
+        slowCallDurationThreshold: 10s
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        maxWaitDurationInHalfOpenState: 0
+        waitDurationInOpenState: 10s
+    instances:
+      reservation-service-circuit-breaker:
+        base-config: default
+      user-service:
+        base-config: default
+
+passport:
+  secret-key: ${PASSPORT_SECRET}

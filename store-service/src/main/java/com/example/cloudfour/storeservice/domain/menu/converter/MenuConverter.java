@@ -22,9 +22,10 @@ public class MenuConverter {
     }
 
     public static MenuResponseDTO.MenuDetailResponseDTO toMenuDetail1ResponseDTO(Menu menu) {
+        Long quantity = (menu.getStock() != null) ? menu.getStock().getQuantity() : 0L;
         return MenuResponseDTO.MenuDetailResponseDTO.builder()
                 .menuCommonResponseDTO(toMenuCommonResponseDTO(menu))
-                .quantity(menu.getStock().getQuantity())
+                .quantity(quantity)
                 .content(menu.getContent())
                 .createdAt(menu.getCreatedAt())
                 .updatedAt(menu.getUpdatedAt())
@@ -53,6 +54,13 @@ public class MenuConverter {
     public static MenuResponseDTO.MenuListResponseDTO toMenuListResponseDTO(StoreDocument.Menu menu) {
         return MenuResponseDTO.MenuListResponseDTO.builder()
                 .menuCommonResponseDTO(documentToMenuCommonResponseDTO(menu))
+                .createdAt(menu.getCreatedAt())
+                .build();
+    }
+
+    public static MenuResponseDTO.MenuListResponseDTO toMenuListResponseDTO(Menu menu) {
+        return MenuResponseDTO.MenuListResponseDTO.builder()
+                .menuCommonResponseDTO(toMenuCommonResponseDTO(menu))
                 .createdAt(menu.getCreatedAt())
                 .build();
     }
@@ -89,10 +97,12 @@ public class MenuConverter {
 
 
     public static MenuCommonResponseDTO toMenuCommonResponseDTO(Menu menu) {
+        Long quantity = (menu.getStock() != null) ? menu.getStock().getQuantity() : 0L;
         return MenuCommonResponseDTO.builder()
                 .menuId(menu.getId())
                 .name(menu.getName())
                 .price(menu.getPrice())
+                .quantity(quantity)
                 .menuPicture(menu.getMenuPicture())
                 .status(menu.getStatus())
                 .category(menu.getMenuCategory().getCategory())

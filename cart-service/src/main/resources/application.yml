@@ -37,7 +37,6 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
-      password: ${REDIS_PASSWORD}
       timeout: 2000ms
       lettuce:
         pool:
@@ -48,6 +47,12 @@ spring:
   cloud:
     config:
       enabled: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: order-service-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
 
 passport:
   secret-key: ${PASSPORT_SECRET}
@@ -61,31 +66,47 @@ passport:
     default-produces-media-type: application/json
 
 kafka:
-  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
-  producer:
-    key-serializer: org.apache.kafka.common.serialization.StringSerializer
-    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-    acks: all
-    retries: 3
-    batch-size: 16384
-    linger-ms: 10
-    buffer-memory: 33554432
-  consumer:
-    group-id: order-service-group
-    auto-offset-reset: earliest
-    key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-    value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-    enable-auto-commit: false
-    properties:
-      spring.json.trusted.packages: "com.example.cloudfour.paymentservice.domain.payment.event,com.example.cloudfour.cartservice.event"
-  topic:
-    order-events: order-events
-    payment-events: payment-events
+  topics:
+    orderEvents: order.events.v1
+    orderCommands: order.commands.v1
+    paymentEvents: payment.events.v1
+
+    orderCommandsDLQ: order.commands.dlq.v1
+
+app:
+  eventPublishEnabled: ${EVENT_PUBLISH_ENABLED:true}
+  outbox:
+    enabled: true
+  saga:
+    enabled: true
 
 logging:
   level:
     org.springframework.cache: DEBUG
     com.example.cloudfour.cartservice.client: DEBUG
+
+order:
+  timeout:
+    minutes: 0.17  # 주문 타임아웃 시간 (분) - 10초(테스트용) 실제로는 10분
+    
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        failureRateThreshold: 50
+        slowCallRateThreshold: 80
+        slowCallDurationThreshold: 10s
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        maxWaitDurationInHalfOpenState: 0
+        waitDurationInOpenState: 10s
+    instances:
+      reservation-service-circuit-breaker:
+        base-config: default
+      user-service:
+        base-config: default
 
 
 

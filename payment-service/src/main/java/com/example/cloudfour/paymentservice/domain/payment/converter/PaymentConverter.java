@@ -3,6 +3,7 @@ package com.example.cloudfour.paymentservice.domain.payment.converter;
 import com.example.cloudfour.paymentservice.domain.payment.dto.PaymentResponseDTO;
 import com.example.cloudfour.paymentservice.domain.payment.entity.Payment;
 import com.example.cloudfour.paymentservice.domain.payment.entity.PaymentHistory;
+import com.example.cloudfour.paymentservice.domain.payment.enums.PaymentStatus;
 import org.springframework.stereotype.Component;
 
 import java.time.format.DateTimeFormatter;
@@ -46,6 +47,46 @@ public class PaymentConverter {
                 .paymentStatus(responseStatus)
                 .cancelReason(history.getChangeReason())
                 .canceledAt(payment.getCanceledAt())
+                .build();
+    }
+
+    public PaymentHistory createPaymentApprovedHistory(Payment payment, String rawResponse) {
+        return PaymentHistory.builder()
+                .payment(payment)
+                .previousStatus(null)
+                .currentStatus(PaymentStatus.APPROVED)
+                .changeReason("토스페이먼츠 결제 승인")
+                .rawResponse(rawResponse)
+                .build();
+    }
+
+    public PaymentHistory createPaymentFailedHistory(Payment payment, String errorMessage) {
+        return PaymentHistory.builder()
+                .payment(payment)
+                .previousStatus(null)
+                .currentStatus(PaymentStatus.FAILED)
+                .changeReason("토스페이먼츠 결제 승인 실패: " + errorMessage)
+                .rawResponse("{\"error\":\"" + errorMessage + "\"}")
+                .build();
+    }
+
+    public PaymentHistory createPaymentCanceledHistory(Payment payment, String cancelReason, String rawResponse) {
+        return PaymentHistory.builder()
+                .payment(payment)
+                .previousStatus(PaymentStatus.APPROVED)
+                .currentStatus(PaymentStatus.CANCELED)
+                .changeReason("토스페이먼츠 결제 취소: " + cancelReason)
+                .rawResponse(rawResponse)
+                .build();
+    }
+
+    public PaymentHistory createPaymentCancelFailedHistory(Payment payment, String errorMessage) {
+        return PaymentHistory.builder()
+                .payment(payment)
+                .previousStatus(payment.getPaymentStatus())
+                .currentStatus(payment.getPaymentStatus())
+                .changeReason("토스페이먼츠 결제 취소 실패: " + errorMessage)
+                .rawResponse("{\"error\":\"" + errorMessage + "\"}")
                 .build();
     }
 }

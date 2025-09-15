@@ -36,7 +36,7 @@ spring:
 
   data:
     mongodb:
-      uri: ${MONGO_URI}
+      uri: ${LOCAL_MONGO_URI}
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
@@ -50,23 +50,49 @@ spring:
       enabled: false
 
   kafka:
-    bootstrap-servers: localhost:29092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      acks: all
-      retries: 3
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
-      group-id: store-service
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      group-id: store-service-group
       auto-offset-reset: earliest
       enable-auto-commit: false
-      properties:
-        spring.json.trusted.packages: "com.example.cloudfour.paymentservice.domain.payment.event,com.example.cloudfour.cartservice.event"
-    topic:
-      order-events: order-events
-      payment-events: payment-events
+
+kafka:
+  topics:
+    inventoryCommands: inventory.commands.v1
+    inventoryEvents: inventory.events.v1
+    orderEvents: order.events.v1
+    paymentEvents: payment.events.v1
+
+    inventoryCommandsDLQ: inventory.commands.dlq.v1
+    paymentEventsDLQ: payment.events.dlq.v1
+
+app:
+  eventPublishEnabled: ${EVENT_PUBLISH_ENABLED:true}
+  outbox:
+    enabled: ${OUTBOX_ENABLED:true}
       
 passport:
   secret-key: ${PASSPORT_SECRET}
+
+feign:
+  circuitbreaker:
+    enabled: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        failureRateThreshold: 50
+        slowCallRateThreshold: 80
+        slowCallDurationThreshold: 10s
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        maxWaitDurationInHalfOpenState: 0
+        waitDurationInOpenState: 10s
+    instances:
+      reservation-service-circuit-breaker:
+        base-config: default
+      user-service:
+        base-config: default

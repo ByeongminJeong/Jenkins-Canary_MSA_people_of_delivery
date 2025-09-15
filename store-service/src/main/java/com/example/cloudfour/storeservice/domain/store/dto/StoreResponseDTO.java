@@ -1,5 +1,7 @@
 package com.example.cloudfour.storeservice.domain.store.dto;
 
+import com.example.cloudfour.storeservice.domain.menu.dto.MenuResponseDTO;
+import com.example.cloudfour.storeservice.domain.review.dto.ReviewResponseDTO;
 import com.example.cloudfour.storeservice.domain.store.controller.StoreCommonResponseDTO;
 
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
@@ -65,5 +67,8 @@ public class StoreResponseDTO {
         StoreCommonResponseDTO.StoreCommonMainResponseDTO storeCommonMainResponseDTO;
         @JsonUnwrapped
         StoreCommonResponseDTO.StoreCommonOptionResponseDTO storeCommonOptionResponseDTO;
+        List<ReviewResponseDTO.ReviewDocumentResponseDTO> reviewUserResponseDTOS;
+        List<MenuResponseDTO.MenuListResponseDTO> menuListResponseDTOS;
+
     }
 }

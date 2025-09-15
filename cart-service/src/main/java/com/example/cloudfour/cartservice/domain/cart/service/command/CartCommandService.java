@@ -102,7 +102,7 @@ public class CartCommandService {
     }
 
     private Cart createCartEntity(UUID userId, UUID storeId) {
-        Cart cart = Cart.builder().build();
+        Cart cart = CartConverter.createEmptyCart();
         cart.setUser(userId);
         cart.setStore(storeId);
         return cart;

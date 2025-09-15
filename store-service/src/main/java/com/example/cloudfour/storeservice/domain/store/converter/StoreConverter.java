@@ -2,12 +2,16 @@ package com.example.cloudfour.storeservice.domain.store.converter;
 
 import com.example.cloudfour.storeservice.domain.collection.document.StoreDocument;
 import com.example.cloudfour.storeservice.domain.common.StoreCartResponseDTO;
+import com.example.cloudfour.storeservice.domain.menu.dto.MenuResponseDTO;
+import com.example.cloudfour.storeservice.domain.menu.converter.MenuConverter;
+import com.example.cloudfour.storeservice.domain.review.dto.ReviewResponseDTO;
 import com.example.cloudfour.storeservice.domain.store.controller.StoreCommonResponseDTO;
 import com.example.cloudfour.storeservice.domain.store.dto.StoreRequestDTO;
 import com.example.cloudfour.storeservice.domain.store.dto.StoreResponseDTO;
 import com.example.cloudfour.storeservice.domain.store.entity.Store;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 public class StoreConverter {
 
@@ -78,6 +82,8 @@ public class StoreConverter {
                 .storeCommonMainResponseDTO(documentToStoreCommonMainResponseDTO(storeDocument))
                 .storeCommonOptionResponseDTO(documentToStoreCommonOptionResponseDTO(storeDocument))
                 .storeCommonsBaseResponseDTO(documentToStoreCommonBaseResponseDTO(storeDocument))
+                .menuListResponseDTOS(documentToMenuListResponseDTO(storeDocument))
+                .reviewUserResponseDTOS(documentToReviewUserResponseDTO(storeDocument))
                 .build();
     }
 
@@ -137,6 +143,30 @@ public class StoreConverter {
                 .storePicture(storeDocument.getPictureURL())
                 .build();
     }
+
+    public static List<MenuResponseDTO.MenuListResponseDTO> documentToMenuListResponseDTO(StoreDocument storeDocument){
+        if (storeDocument.getMenus() == null) {
+            return java.util.List.of();
+        }
+        return storeDocument.getMenus().stream()
+                .map(MenuConverter::toMenuListResponseDTO)
+                .toList();
+    }
+
+    public static List<ReviewResponseDTO.ReviewDocumentResponseDTO> documentToReviewUserResponseDTO(StoreDocument storeDocument){
+        if (storeDocument.getReviews() == null) {
+            return java.util.List.of();
+        }
+        return storeDocument.getReviews().stream()
+                .filter(Objects::nonNull)
+                .map(r -> ReviewResponseDTO.ReviewDocumentResponseDTO.builder()
+                        .reviewId(r.getId())
+                        .score(r.getScore())
+                        .content(r.getContent())
+                        .build())
+                .toList();
+    }
+
 
     public static StoreCartResponseDTO toFindStoreDTO(Store store){
         return StoreCartResponseDTO.builder()

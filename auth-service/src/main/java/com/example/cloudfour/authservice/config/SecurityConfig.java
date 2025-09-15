@@ -1,5 +1,6 @@
 package com.example.cloudfour.authservice.config;
 
+import com.example.cloudfour.modulecommon.filter.JwtClaimsAuthFilter;
 import com.example.cloudfour.modulecommon.passport.filter.InternalPassportFilter;
 import com.example.cloudfour.modulecommon.filter.JwtClaimsAuthFilter;
 import com.example.cloudfour.modulecommon.util.PassportUtil;
@@ -20,7 +21,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtClaimsAuthFilter jwtClaimsAuthFilter(){
+    JwtClaimsAuthFilter jwtClaimsAuthFilter() {
         return new JwtClaimsAuthFilter();
     }
 

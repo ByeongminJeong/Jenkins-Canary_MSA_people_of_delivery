@@ -102,15 +102,19 @@ public class Order extends BaseEntity {
     }
 
     public boolean isCompleted() {
-        return this.status == OrderStatus.주문완료;
+        return this.status == OrderStatus.DELIVERED;
     }
 
     public boolean isCancelled() {
-        return this.status == OrderStatus.주문취소;
+        return this.status == OrderStatus.ORDER_CANCELED;
     }
 
     public boolean isInProgress() {
-        return this.status != OrderStatus.주문완료 && this.status != OrderStatus.주문취소;
+        return this.status != OrderStatus.DELIVERED && this.status != OrderStatus.ORDER_CANCELED;
+    }
+
+    public void updateStatus(OrderStatus newStatus) {
+        this.status = newStatus;
     }
 
 

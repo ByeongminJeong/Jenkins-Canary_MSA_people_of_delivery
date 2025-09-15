@@ -6,9 +6,7 @@ import com.example.cloudfour.storeservice.domain.menu.service.query.StockQuerySe
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -29,21 +27,5 @@ public class InternalStockController {
     @GetMapping("/menus/{menuId}/stock/availability")
     public StockResponseDTO.StockAvailabilityResponseDTO getMenuStockAvailability(@PathVariable("menuId") UUID menuId) {
         return stockQueryService.getMenuStockAvailability(menuId);
-    }
-
-    @PostMapping("/menus/stock/{stockId}/decrease")
-    public void decreaseStock(
-            @PathVariable("stockId") UUID stockId,
-            @RequestParam(name = "quantity") Long quantity
-    ){
-        stockCommandService.decreaseStock(stockId,quantity);
-    }
-
-    @PostMapping("/menus/stock/{stockId}/increase")
-    public void increaseStock(
-            @PathVariable("stockId") UUID stockId,
-            @RequestParam(name = "quantity") Long quantity
-    ){
-        stockCommandService.increaseStock(stockId,quantity);
     }
 }

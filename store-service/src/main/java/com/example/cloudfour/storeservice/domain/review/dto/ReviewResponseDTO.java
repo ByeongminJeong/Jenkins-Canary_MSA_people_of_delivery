@@ -59,6 +59,14 @@ public class ReviewResponseDTO {
 
     @Getter
     @Builder
+    public static class ReviewDocumentResponseDTO{
+        UUID reviewId;
+        Float score;
+        String content;
+    }
+
+    @Getter
+    @Builder
     public static class ReviewUserListResponseDTO{
         List<ReviewUserResponseDTO> reviews;
         private boolean hasNext;

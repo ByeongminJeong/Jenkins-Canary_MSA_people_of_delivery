@@ -7,8 +7,14 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.ArrayOperators;
+import org.springframework.data.mongodb.core.aggregation.ComparisonOperators;
+import org.springframework.data.mongodb.core.aggregation.UnsetOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.repository.support.QuerydslRepositorySupport;
@@ -16,7 +22,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,47 +41,23 @@ public class StoreSearchRepositoryImpl extends QuerydslRepositorySupport impleme
 
     @Override
     public Optional<StoreDocument> findStoreByStoreId(UUID storeId) {
-        StoreDocument store = from(storeDocument)
-                .where(storeDocument.storeId.eq(storeId))
-                .fetchOne();
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("storeId").is(storeId)),
+                Aggregation.project("id", "storeId", "userId", "name", "address", "phone", "content",
+                                "minPrice", "deliveryTip", "rating", "likeCount", "reviewCount",
+                                "OperationHours", "closedDays", "siDo", "siGunGu", "eupMyeonDong",
+                                "pictureURL", "createdAt", "storeCategory", "menus", "reviews")
+                        .and(ArrayOperators.Filter.filter("menus")
+                                .as("m")
+                                .by(ComparisonOperators.Ne.valueOf("m.menuStatus")
+                                        .notEqualTo(MenuStatus.숨김.name())))
+                        .as("menus"),
+                UnsetOperation.unset("menus.menuOptions")
+        );
 
-        if (store == null) {
-            return Optional.empty();
-        }
-
-        if (store.getMenus() != null) {
-            List<StoreDocument.Menu> visibleMenus = store.getMenus().stream()
-                    .filter(menu -> menu.getMenuStatus() != MenuStatus.숨김)
-                    .collect(Collectors.toList());
-
-            StoreDocument filteredStore = StoreDocument.builder()
-                    .id(store.getId())
-                    .storeId(store.getStoreId())
-                    .userId(store.getUserId())
-                    .name(store.getName())
-                    .address(store.getAddress())
-                    .phone(store.getPhone())
-                    .content(store.getContent())
-                    .minPrice(store.getMinPrice())
-                    .deliveryTip(store.getDeliveryTip())
-                    .rating(store.getRating())
-                    .likeCount(store.getLikeCount())
-                    .reviewCount(store.getReviewCount())
-                    .OperationHours(store.getOperationHours())
-                    .closedDays(store.getClosedDays())
-                    .siDo(store.getSiDo())
-                    .siGunGu(store.getSiGunGu())
-                    .eupMyeonDong(store.getEupMyeonDong())
-                    .pictureURL(store.getPictureURL())
-                    .createdAt(store.getCreatedAt())
-                    .storeCategory(store.getStoreCategory())
-                    .menus(visibleMenus)
-                    .reviews(store.getReviews())
-                    .build();
-
-            return Optional.of(filteredStore);
-        }
-        return Optional.of(store);
+        AggregationResults<StoreDocument> results = mongoTemplate.aggregate(aggregation, "store-service", StoreDocument.class);
+        StoreDocument mapped = results.getUniqueMappedResult();
+        return Optional.ofNullable(mapped);
     }
 
     @Override
@@ -140,22 +121,18 @@ public class StoreSearchRepositoryImpl extends QuerydslRepositorySupport impleme
 
     @Override
     public List<StoreDocument.Menu> findMenuByStoreId(UUID storeId) {
-        Criteria criteria = new Criteria().andOperator(
-                Criteria.where("storeId").is(storeId)
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("storeId").is(storeId)),
+                Aggregation.unwind("menus"),
+                Aggregation.match(Criteria.where("menus.menuStatus").ne(MenuStatus.숨김.name())),
+                Aggregation.replaceRoot("menus")
         );
 
-        Query mongoQuery = new Query(criteria);
-        mongoQuery.fields().include("menus");
+        AggregationResults<StoreDocument.Menu> results = mongoTemplate.aggregate(
+                aggregation, "store-service", StoreDocument.Menu.class);
 
-        StoreDocument storeDocument = mongoTemplate.findOne(mongoQuery, StoreDocument.class);
-
-        if (storeDocument == null || storeDocument.getMenus() == null) {
-            return Collections.emptyList();
-        }
-
-        return storeDocument.getMenus().stream()
-                .filter(menu -> menu.getMenuStatus() != MenuStatus.숨김)
-                .collect(Collectors.toList());
+        return results.getMappedResults();
     }
 
     @Override
@@ -199,22 +176,19 @@ public class StoreSearchRepositoryImpl extends QuerydslRepositorySupport impleme
 
     @Override
     public List<StoreDocument.MenuOption> findMenuOptionByMenuIdOrderByAdditionalPrice(UUID menuId) {
-        Criteria criteria = Criteria.where("menus.id").is(menuId);
-        Query mongoQuery = new Query(criteria);
-        mongoQuery.fields().include("menus.$");
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("menus.id").is(menuId)),
+                Aggregation.unwind("menus"),
+                Aggregation.match(Criteria.where("menus.id").is(menuId)),
+                Aggregation.unwind("menus.menuOptions"),
+                Aggregation.sort(Sort.by("menus.menuOptions.additionalPrice").ascending()),
+                Aggregation.replaceRoot("menus.menuOptions")
+        );
 
-        StoreDocument result = mongoTemplate.findOne(mongoQuery, StoreDocument.class);
+        AggregationResults<StoreDocument.MenuOption> results = mongoTemplate.aggregate(
+                aggregation, StoreDocument.class, StoreDocument.MenuOption.class);
 
-        if (result != null && result.getMenus() != null && !result.getMenus().isEmpty()) {
-            StoreDocument.Menu menu = result.getMenus().getFirst();
-            if (menu.getMenuOptions() != null) {
-                return menu.getMenuOptions().stream()
-                        .sorted(Comparator.comparing(StoreDocument.MenuOption::getAdditionalPrice))
-                        .collect(Collectors.toList());
-            }
-        }
-
-        return Collections.emptyList();
+        return results.getMappedResults();
     }
 
     @Override

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.extern.jackson.Jacksonized;
 
 import java.util.List;
 import java.util.UUID;
@@ -11,6 +12,7 @@ import java.util.UUID;
 public class CartRequestDTO {
     @Getter
     @Builder
+    @Jacksonized
     public static class CartCreateRequestDTO {
         
         @NotNull(message = "스토어 ID는 필수입니다")

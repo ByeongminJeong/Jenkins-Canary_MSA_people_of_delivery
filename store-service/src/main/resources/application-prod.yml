@@ -18,6 +18,12 @@ management:
     mongo:
       enabled: false
 
+logging:
+  level:
+    org.springframework.cloud.gateway: WARN
+    reactor.netty: WARN
+    root: WARN
+
 spring:
   application:
     name: store-service
@@ -29,9 +35,20 @@ spring:
         format_sql: true
         highlight_sql: true
 
+  springdoc:
+    api-docs:
+      version: openapi_3_1
+      enabled: true
+    enable-spring-security: true
+    default-consumes-media-type: application/json
+    default-produces-media-type: application/json
+
   data:
     mongodb:
       uri: ${MONGO_URI}
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
 
   datasource:
     url: ${DB_URL}
@@ -39,12 +56,69 @@ spring:
     # driver-class-name: org.h2.Driver # 테스트용
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 2
+      idle-timeout: 300000        # 5m
+      max-lifetime: 1500000       # 25m
+      keepalive-time: 1200000     # 20m
+      connection-timeout: 30000
+      validation-timeout: 3000
+      auto-commit: false
 
   cloud:
     config:
       enabled: false
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: store-service-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+kafka:
+  topics:
+    inventoryCommands: inventory.commands.v1
+    inventoryEvents: inventory.events.v1
+    orderEvents: order.events.v1
+    paymentEvents: payment.events.v1
+
+    inventoryCommandsDLQ: inventory.commands.dlq.v1
+    paymentEventsDLQ: payment.events.dlq.v1
+
+app:
+  eventPublishEnabled: ${EVENT_PUBLISH_ENABLED:true}
+  outbox:
+    enabled: ${OUTBOX_ENABLED:true}
+
+passport:
+  secret-key: ${PASSPORT_SECRET}
+
+feign:
+  circuitbreaker:
+    enabled: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        failureRateThreshold: 50
+        slowCallRateThreshold: 80
+        slowCallDurationThreshold: 10s
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        maxWaitDurationInHalfOpenState: 0
+        waitDurationInOpenState: 10s
+    instances:
+      reservation-service-circuit-breaker:
+        base-config: default
+      user-service:
+        base-config: default

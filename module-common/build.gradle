@@ -12,9 +12,7 @@ jar {
 
 
 dependencies {
-    implementation 'org.springframework.cloud:spring-cloud-starter-config'
     implementation 'org.springframework.cloud:spring-cloud-starter-bootstrap'
-    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation 'org.springframework.boot:spring-boot-starter-batch'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -36,6 +34,11 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
     implementation "org.springframework.cloud:spring-cloud-starter-openfeign"
+    implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
+
+    // Kafka
+    implementation 'org.springframework.kafka:spring-kafka'
+    implementation 'org.apache.kafka:kafka-clients'
 
     // Querydsl 추가 - 버전을 명시적으로 지정
     implementation "com.querydsl:querydsl-jpa:${querydslVersion}:jakarta"

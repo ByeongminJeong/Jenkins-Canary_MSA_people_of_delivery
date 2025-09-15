@@ -2,6 +2,7 @@ package com.example.cloudfour.authservice.client;
 
 import com.example.cloudfour.authservice.domain.auth.dto.UserRequestDTO;
 import com.example.cloudfour.authservice.domain.auth.dto.UserResponseDTO;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.UUID;
 
 @FeignClient(name="user-service", url="http://user-service.app.svc.cluster.local:80/internal/users")
+@CircuitBreaker(name="user-circuit")
 public interface UserFeignClient {
     @GetMapping("/exists")
     UserResponseDTO.ExistsByEmailResponseDTO existsByEmail(@RequestParam("email") String email);

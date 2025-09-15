@@ -138,40 +138,6 @@ public class StoreClient {
         }
     }
 
-    @Retryable(value = {Exception.class}, maxAttempts = 3, backoff = @Backoff(delay = 1000))
-    public boolean decreaseStock(UUID stockId, Long quantity) {
-        if (stockId == null || quantity == null || quantity <= 0) {
-            log.warn("잘못된 재고 감소 요청: stockId={}, quantity={}", stockId, quantity);
-            return false;
-        }
-
-        try {
-            storeClient.decreaseStock(stockId, quantity);
-            log.info("재고 감소 완료: stockId={}, quantity={}", stockId, quantity);
-            return true;
-        } catch (Exception e) {
-            log.error("재고 감소 실패: stockId={}, quantity={}", stockId, quantity, e);
-            throw e;
-        }
-    }
-
-    @Retryable(value = {Exception.class}, maxAttempts = 3, backoff = @Backoff(delay = 1000))
-    public boolean increaseStock(UUID stockId, Long quantity) {
-        if (stockId == null || quantity == null || quantity <= 0) {
-            log.warn("잘못된 재고 증가 요청: stockId={}, quantity={}", stockId, quantity);
-            return false;
-        }
-
-        try {
-            storeClient.increaseStock(stockId, quantity);
-            log.info("재고 증가 완료: stockId={}, quantity={}", stockId, quantity);
-            return true;
-        } catch (Exception e) {
-            log.error("재고 증가 실패: stockId={}, quantity={}", stockId, quantity, e);
-            throw e;
-        }
-    }
-
     public List<MenuOptionResponseDTO> menuOptionsByIds(List<UUID> menuOptionIds) {
         if (menuOptionIds == null || menuOptionIds.isEmpty()) {
             return List.of();

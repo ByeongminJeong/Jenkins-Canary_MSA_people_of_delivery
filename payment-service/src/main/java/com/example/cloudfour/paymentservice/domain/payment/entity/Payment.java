@@ -24,7 +24,7 @@ public class Payment extends BaseEntity {
     @GeneratedValue
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true)
     private String paymentKey;
 
     @Column(nullable = false)
@@ -90,6 +90,24 @@ public class Payment extends BaseEntity {
         this.rawResponse = maskSensitiveInfo(rawResponse);
     }
 
+    public void updateStatus(PaymentStatus newStatus) {
+        this.paymentStatus = newStatus;
+    }
+
+    public void setFailedReason(String reason) {
+        this.failedReason = reason;
+    }
+
+    public void updatePaymentInfo(String paymentKey, Integer amount, String paymentMethod, 
+                                 PaymentStatus status, LocalDateTime approvedAt, String rawResponse) {
+        this.paymentKey = paymentKey;
+        this.amount = amount;
+        this.paymentMethod = paymentMethod;
+        this.paymentStatus = status;
+        this.approvedAt = approvedAt;
+        this.rawResponse = maskSensitiveInfo(rawResponse);
+    }
+
 
 
     public boolean canCancel() {
@@ -108,7 +126,6 @@ public class Payment extends BaseEntity {
                                    "$1****$3");
     }
 
-    // 테스트 및 내부 사용
     public void setIdempotencyKey(String idempotencyKey) {
         this.idempotencyKey = idempotencyKey;
     }

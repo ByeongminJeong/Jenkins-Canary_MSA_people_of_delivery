@@ -17,6 +17,12 @@ management:
     redis:
       enabled: false
 
+logging:
+  level:
+    org.springframework.cloud.gateway: WARN
+    reactor.netty: WARN
+    root: WARN
+
 spring:
   application:
     name: user-service
@@ -34,6 +40,16 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 2
+      idle-timeout: 300000        # 5m
+      max-lifetime: 1500000       # 25m
+      keepalive-time: 1200000     # 20m
+      connection-timeout: 30000
+      validation-timeout: 3000
+      auto-commit: false
+
   cloud:
     config:
       enabled: false
@@ -59,3 +75,14 @@ spring:
           timeout: 5000
           writetimeout: 5000
     auth-code-expiration-millis: 1800000
+
+  springdoc:
+    api-docs:
+      version: openapi_3_1
+      enabled: true
+    enable-spring-security: true
+    default-consumes-media-type: application/json
+    default-produces-media-type: application/json
+
+passport:
+  secret-key: ${PASSPORT_SECRET}

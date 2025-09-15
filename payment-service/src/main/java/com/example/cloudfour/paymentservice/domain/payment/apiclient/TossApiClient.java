@@ -12,15 +12,16 @@ public class TossApiClient {
 
     private final TossFeginClient tossFeginClient;
 
+
     public TossApproveResponse approvePayment(String paymentKey, String orderId, Integer amount, String idempotencyKey) {
         try {
             log.info("토스 결제 승인 요청: paymentKey={}, orderId={}, amount={}", paymentKey, orderId, amount);
             TossApproveResponse response = tossFeginClient.approvePayment(
-                    paymentKey,
                     idempotencyKey,
                     PaymentRequestDTO.TossApproveRequest.builder()
-                    .amount(amount)
+                    .paymentKey(paymentKey)
                     .orderId(orderId)
+                    .amount(amount)
                     .build()
             );
             log.info("토스 결제 승인 성공: paymentKey={}", paymentKey);

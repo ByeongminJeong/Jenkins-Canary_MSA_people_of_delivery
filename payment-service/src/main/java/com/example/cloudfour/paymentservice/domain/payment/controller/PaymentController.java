@@ -6,11 +6,13 @@ import com.example.cloudfour.paymentservice.domain.payment.dto.PaymentRequestDTO
 import com.example.cloudfour.paymentservice.domain.payment.dto.PaymentResponseDTO;
 import com.example.cloudfour.paymentservice.domain.payment.service.command.PaymentCommandService;
 import com.example.cloudfour.paymentservice.domain.payment.service.query.PaymentQueryService;
+import com.example.cloudfour.paymentservice.domain.payment.service.PaymentProcessService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -30,17 +32,53 @@ public class PaymentController {
     
     private final PaymentCommandService paymentCommandService;
     private final PaymentQueryService paymentQueryService;
+    private final PaymentProcessService paymentProcessService;
+
+    @GetMapping("/success")
+    @Operation(summary = "결제 성공 페이지", description = "토스페이먼츠 결제 성공 후 리다이렉트되는 페이지입니다.")
+    public ResponseEntity<Void> paymentSuccess(
+            @RequestParam String paymentKey,
+            @RequestParam String orderId,
+            @RequestParam Long amount
+    ) {
+        PaymentProcessService.PaymentSuccessResult result = paymentProcessService.processSuccess(paymentKey, orderId, amount);
+        
+        return ResponseEntity.status(HttpStatus.SEE_OTHER)
+                .header("Location", result.getFrontendUrl())
+                .build();
+    }
+
+    @GetMapping("/fail")
+    @Operation(summary = "결제 실패 페이지", description = "토스페이먼츠 결제 실패 후 리다이렉트되는 페이지입니다.")
+    public ResponseEntity<Void> paymentFail(
+            @RequestParam String code,
+            @RequestParam String message,
+            @RequestParam String orderId
+    ) {
+        paymentProcessService.processFailure(orderId, code, message);
+        
+        String frontendUrl = "http://localhost:3000/payment/fail?orderId=" + orderId + "&code=" + code;
+
+        return ResponseEntity.status(HttpStatus.SEE_OTHER)
+                .header("Location", frontendUrl)
+                .build();
+    }
 
     @PostMapping("/confirm")
     @Operation(summary = "결제 승인", description = "프론트엔드에서 받은 결제 정보를 승인합니다.")
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     public CustomResponse<PaymentResponseDTO.PaymentConfirmResponseDTO> confirmPayment(
-            @Valid @RequestBody PaymentRequestDTO.PaymentConfirmRequestDTO request,
+            @Valid @RequestBody PaymentRequestDTO.PaymentConfirmFromFrontendRequestDTO request,
             @AuthenticationPrincipal Passport passport
     ){
-        log.info("결제 승인 요청: paymentKey={}, orderId={}, userId={}", request.getPaymentKey(), request.getOrderId(), passport.getUserId());
-        PaymentResponseDTO.PaymentConfirmResponseDTO response = paymentCommandService.confirmPayment(request, passport.getUserId());
-        return CustomResponse.onSuccess(HttpStatus.OK, response);
+        PaymentProcessService.PaymentConfirmResult result = paymentProcessService.processConfirm(
+                request.getOrderId(), request.getAmount(), passport.getUserId());
+        
+        if (result.isSuccess()) {
+            return CustomResponse.onSuccess(HttpStatus.OK, result.getResponse());
+        } else {
+            throw result.getException();
+        }
     }
 
     @PostMapping("/webhook")

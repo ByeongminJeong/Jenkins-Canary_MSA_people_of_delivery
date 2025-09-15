@@ -33,4 +33,6 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     boolean existsByPaymentKey(String paymentKey);
     
     boolean existsByOrderId(UUID orderId);
+    
+    boolean existsByOrderIdAndUserId(UUID orderId, UUID userId);
 }

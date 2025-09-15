@@ -81,10 +81,7 @@ public class CartItemCommandService {
             }
         }
 
-        CartItem item = CartItem.builder()
-                .quantity(quantity)
-                .price(totalPrice)
-                .build();
+        CartItem item = CartItemConverter.createCartItem(quantity, totalPrice);
         item.setCart(cart);
         item.setMenu(menu.getMenuId());
         attachOptions(item, options);
@@ -142,10 +139,7 @@ public class CartItemCommandService {
             }
         }
 
-        CartItem item = CartItem.builder()
-                .quantity(quantity)
-                .price(totalPrice)
-                .build();
+        CartItem item = CartItemConverter.createCartItem(quantity, totalPrice);
         item.setCart(cart);
         item.setMenu(menu.getMenuId());
         attachOptions(item, options);
@@ -257,11 +251,11 @@ public class CartItemCommandService {
     private void attachOptions(CartItem item, List<MenuOptionResponseDTO> options) {
         if (options == null || options.isEmpty()) return;
         for (MenuOptionResponseDTO o : options) {
-            CartItemOption opt = CartItemOption.builder()
-                    .menuOptionId(o.getMenuOptionId())
-                    .additionalPrice(o.getAdditionalPrice())
-                    .optionName(o.getOptionName())
-                    .build();
+            CartItemOption opt = CartItemConverter.createCartItemOption(
+                    o.getMenuOptionId(),
+                    o.getAdditionalPrice(),
+                    o.getOptionName()
+            );
             item.addOption(opt);
         }
     }

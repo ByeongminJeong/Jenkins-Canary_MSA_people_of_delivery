@@ -2,7 +2,8 @@ package com.example.cloudfour.storeservice.domain.menu.dto;
 
 import com.example.cloudfour.storeservice.domain.common.enums.PaymentStatus;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Value;
+import lombok.extern.jackson.Jacksonized;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -10,41 +11,45 @@ import java.util.UUID;
 
 public class PaymentEvent {
 
-    @Getter
+    @Value
     @Builder
+    @Jacksonized
     public static class PaymentCompletedEvent{
-        private UUID orderId;
-        private UUID userId;
-        private UUID paymentId;
-        private Long quantity;
-        private List<OrderItem> orderItems;
-        private LocalDateTime completedAt;
-        private PaymentStatus status;
+        UUID orderId;
+        UUID userId;
+        UUID paymentId;
+        Long quantity;
+        List<OrderItem> orderItems;
+        LocalDateTime completedAt;
+        PaymentStatus status;
 
-        @Getter
+        @Value
         @Builder
+        @Jacksonized
         public static class OrderItem {
-            private UUID menuId;
-            private UUID stockId;
-            private String menuName;
-            private Long quantity;
-            private Integer price;
+            UUID menuId;
+            UUID stockId;
+            String menuName;
+            Long quantity;
+            Integer price;
         }
     }
 
-    @Getter
+    @Value
     @Builder
+    @Jacksonized
     public static class PaymentFailedEvent{
-        private UUID orderId;
-        private UUID userId;
-        private UUID paymentId;
-        private LocalDateTime failedAt;
+        UUID orderId;
+        UUID userId;
+        UUID paymentId;
+        LocalDateTime failedAt;
     }
 
-    @Getter
+    @Value
     @Builder
+    @Jacksonized
     public static class PaymentCanceledEvent{
-        private UUID orderId;
-        private LocalDateTime cancelledAt;
+        UUID orderId;
+        LocalDateTime cancelledAt;
     }
 }

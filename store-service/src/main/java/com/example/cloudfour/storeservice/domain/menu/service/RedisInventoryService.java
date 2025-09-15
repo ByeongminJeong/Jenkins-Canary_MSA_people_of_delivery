@@ -2,6 +2,14 @@ package com.example.cloudfour.storeservice.domain.menu.service;
 
 import com.example.cloudfour.storeservice.domain.menu.converter.StockConverter;
 import com.example.cloudfour.storeservice.domain.menu.dto.StockResponseDTO;
+import com.example.cloudfour.storeservice.domain.menu.entity.Menu;
+import com.example.cloudfour.storeservice.domain.menu.entity.Stock;
+import com.example.cloudfour.storeservice.domain.menu.exception.MenuException;
+import com.example.cloudfour.storeservice.domain.menu.exception.MenuErrorCode;
+import com.example.cloudfour.storeservice.domain.menu.exception.StockException;
+import com.example.cloudfour.storeservice.domain.menu.exception.StockErrorCode;
+import com.example.cloudfour.storeservice.domain.menu.repository.MenuRepository;
+import com.example.cloudfour.storeservice.domain.menu.repository.StockRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -16,6 +24,8 @@ import java.util.UUID;
 public class RedisInventoryService {
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final MenuRepository menuRepository;
+    private final StockRepository stockRepository;
     private final DefaultRedisScript<List> reserveStockScript;
     private final DefaultRedisScript<List> releaseStockScript;
     private final DefaultRedisScript<List> availabilityScript;
@@ -24,8 +34,12 @@ public class RedisInventoryService {
     private static final String RESERVATION_KEY_PREFIX = "rsrv:menu:";
     private static final String ORDER_RESERVATION_KEY_PREFIX = "order:rsrv:";
 
-    public RedisInventoryService(RedisTemplate<String, String> redisTemplate) {
+    public RedisInventoryService(RedisTemplate<String, String> redisTemplate, 
+                               MenuRepository menuRepository, 
+                               StockRepository stockRepository) {
         this.redisTemplate = redisTemplate;
+        this.menuRepository = menuRepository;
+        this.stockRepository = stockRepository;
         this.reserveStockScript = new DefaultRedisScript<>();
         this.reserveStockScript.setScriptText(getReserveStockScript());
         this.reserveStockScript.setResultType(List.class);
@@ -43,6 +57,10 @@ public class RedisInventoryService {
         String stockKey = STOCK_KEY_PREFIX + menuId;
         String reservationKey = RESERVATION_KEY_PREFIX + menuId;
         String orderReservationKey = ORDER_RESERVATION_KEY_PREFIX + orderId;
+
+        if (!redisTemplate.hasKey(stockKey)) {
+            ensureStockInRedis(menuId);
+        }
 
         try {
             @SuppressWarnings("unchecked")
@@ -246,5 +264,30 @@ public class RedisInventoryService {
             local available = current - reserved
             return {0, available, current, reserved}
         """;
+    }
+
+    private void ensureStockInRedis(UUID menuId) {
+        try {
+            log.info("Redis에 재고 정보가 없어서 DB에서 조회: menuId={}", menuId);
+            
+            Menu menu = menuRepository.findById(menuId)
+                .orElseThrow(() -> new MenuException(MenuErrorCode.NOT_FOUND));
+            
+            Stock stock = stockRepository.findByIdWithOptimisticLock(menu.getStock().getId())
+                .orElseThrow(() -> new StockException(StockErrorCode.NOT_FOUND));
+            
+            String stockKey = STOCK_KEY_PREFIX + menuId;
+            redisTemplate.opsForValue().set(stockKey, String.valueOf(stock.getQuantity()));
+            
+            log.info("DB에서 조회한 재고 정보를 Redis에 저장: menuId={}, quantity={}", 
+                    menuId, stock.getQuantity());
+                    
+        } catch (MenuException | StockException e) {
+            log.error("재고 정보 조회 실패: menuId={}, error={}", menuId, e.getMessage(), e);
+            throw e;
+        } catch (Exception e) {
+            log.error("Redis에 재고 정보 저장 실패: menuId={}, error={}", menuId, e.getMessage(), e);
+            throw new StockException(StockErrorCode.INTERNAL_ERROR);
+        }
     }
 }

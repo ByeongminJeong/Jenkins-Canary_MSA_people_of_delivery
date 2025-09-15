@@ -5,6 +5,7 @@ import com.example.cloudfour.cartservice.commondto.MenuQuantityResponseDTO;
 import com.example.cloudfour.cartservice.commondto.MenuResponseDTO;
 import com.example.cloudfour.cartservice.commondto.StoreResponseDTO;
 import com.example.cloudfour.cartservice.config.FeignConfig;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,9 +18,10 @@ import java.util.UUID;
 
 @FeignClient(
         name = "store-service",
-        path = "http://store-service.app.svc.cluster.local:80/internal",
+        url="http://store-service.app.svc.cluster.local:80/internal",
         configuration = FeignConfig.class
 )
+@CircuitBreaker(name = "store-circuit")
 public interface StoreFeignClient {
     @RequestMapping(method = RequestMethod.HEAD, value = "/stores/exists")
     void checkStoreExists(@RequestParam("storeId") UUID storeId);
@@ -38,10 +40,4 @@ public interface StoreFeignClient {
 
     @GetMapping("/menus/{menuId}/stock")
     MenuQuantityResponseDTO getMenuStock(@PathVariable("menuId") UUID menuId);
-
-    @PostMapping("/menus/stock/{stockId}/decrease")
-    void decreaseStock(@PathVariable("stockId") UUID stockId, @RequestParam("quantity") Long quantity);
-
-    @PostMapping("/menus/stock/{stockId}/increase")
-    void increaseStock(@PathVariable("stockId") UUID stockId, @RequestParam("quantity") Long quantity);
 }

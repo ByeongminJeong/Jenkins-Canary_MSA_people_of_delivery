@@ -117,4 +117,19 @@ public final class CartItemConverter {
                 .optionName(option.getOptionName())
                 .build();
     }
+
+    public static CartItem createCartItem(int quantity, int totalPrice) {
+        return CartItem.builder()
+                .quantity(quantity)
+                .price(totalPrice)
+                .build();
+    }
+
+    public static CartItemOption createCartItemOption(UUID menuOptionId, int additionalPrice, String optionName) {
+        return CartItemOption.builder()
+                .menuOptionId(menuOptionId)
+                .additionalPrice(additionalPrice)
+                .optionName(optionName)
+                .build();
+    }
 }

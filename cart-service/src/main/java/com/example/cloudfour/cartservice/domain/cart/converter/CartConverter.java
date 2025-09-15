@@ -72,4 +72,8 @@ public final class CartConverter {
                 .map(CartItemConverter::toCartItemListResponseDTO)
                 .toList();
     }
+
+    public static Cart createEmptyCart() {
+        return Cart.builder().build();
+    }
 }

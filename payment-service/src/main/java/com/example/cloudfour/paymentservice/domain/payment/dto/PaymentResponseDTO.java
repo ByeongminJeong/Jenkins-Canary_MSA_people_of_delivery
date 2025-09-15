@@ -12,6 +12,7 @@ import java.util.UUID;
 
 public class PaymentResponseDTO {
 
+
     @Getter
     @Builder
     @NoArgsConstructor

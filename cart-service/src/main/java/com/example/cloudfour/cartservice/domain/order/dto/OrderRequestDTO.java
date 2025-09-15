@@ -7,11 +7,13 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.extern.jackson.Jacksonized;
 
 public class OrderRequestDTO {
     
     @Getter
     @Builder
+    @Jacksonized
     public static class OrderCreateRequestDTO {
         
         @NotNull(message = "주문 타입은 필수입니다")
@@ -29,6 +31,7 @@ public class OrderRequestDTO {
 
     @Getter
     @Builder
+    @Jacksonized
     public static class OrderUpdateRequestDTO {
         
         @NotNull(message = "새로운 주문 상태는 필수입니다")

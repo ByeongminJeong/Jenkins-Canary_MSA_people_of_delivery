@@ -1,5 +1,17 @@
 package com.example.cloudfour.cartservice.domain.order.enums;
 
 public enum OrderStatus {
-    결제전, 주문완료, 주문접수, 조리중, 배달원배정, 배달중, 배달완료, 주문취소
+    PENDING,
+    INVENTORY_CONFIRMED,
+    INVENTORY_INSUFFICIENT,
+    INVENTORY_RELEASED,
+    PAYMENT_COMPLETED,
+    PAYMENT_FAILED,
+    PAYMENT_CANCELED,
+    ORDER_ACCEPTED,
+    COOKING,
+    DELIVERY_ASSIGNED,
+    DELIVERING,
+    DELIVERED,
+    ORDER_CANCELED
 }
