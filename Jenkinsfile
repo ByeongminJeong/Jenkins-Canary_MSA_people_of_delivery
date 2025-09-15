@@ -384,13 +384,13 @@ EOF
                             echo "사용할 이미지 태그: $ACTUAL_IMAGE_TAG"
 
                             # 환경변수 치환
-                            sed \
-                                -e "s|\${ECR_REGISTRY}|$ECR_REGISTRY|g" \
-                                -e "s|\${ECR_PREFIX}|$ECR_PREFIX|g" \
-                                -e "s|\${IMAGE_TAG}|$ACTUAL_IMAGE_TAG|g" \
-                                -e "s|\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \
-                                -e "s|\${AWS_REGION}|$AWS_REGION|g" \
-                                -e "s|\${AWS_ACCOUNT_ID}|$AWS_ACCOUNT_ID|g" \
+                            sed \\
+                                -e "s|\\${ECR_REGISTRY}|$ECR_REGISTRY|g" \\
+                                -e "s|\\${ECR_PREFIX}|$ECR_PREFIX|g" \\
+                                -e "s|\\${IMAGE_TAG}|$ACTUAL_IMAGE_TAG|g" \\
+                                -e "s|\\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \\
+                                -e "s|\\${AWS_REGION}|$AWS_REGION|g" \\
+                                -e "s|\\${AWS_ACCOUNT_ID}|$AWS_ACCOUNT_ID|g" \\
                                 "$input_file" > "$output_file"
 
                             echo "치환 완료: $(wc -l < "$output_file") 라인"
