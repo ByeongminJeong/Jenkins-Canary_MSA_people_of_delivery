@@ -103,9 +103,15 @@ pipeline {
                         
                         echo "=== 통합 ConfigMap 생성 (Spring Cloud 제거) ==="
                         cat > /tmp/k8s-config/app-config.properties << EOF
-# Spring 기본 설정 (Cloud 제외)
+# Spring 기본 설정 (Cloud 제거)
 SPRING_PROFILES_ACTIVE=production
 DEPLOYMENT_STRATEGY=${DEPLOYMENT_STRATEGY}
+
+# Eureka 완전 비활성화
+EUREKA_CLIENT_ENABLED=false
+EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
+EUREKA_CLIENT_FETCH_REGISTRY=false
+SPRING_CLOUD_DISCOVERY_ENABLED=false
 
 # 데이터베이스 설정
 SPRING_DATASOURCE_URL=${DB_URL}
