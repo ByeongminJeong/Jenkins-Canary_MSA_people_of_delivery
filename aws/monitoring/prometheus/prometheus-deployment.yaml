@@ -20,7 +20,7 @@ spec:
         eks.amazonaws.com/nodegroup: obs-ng
         workload: observability
       tolerations:
-        - key: "observability"
+        - key: "obs"  # 실제 노드의 taint 키와 일치
           operator: "Equal"
           value: "true"
           effect: "NoSchedule"

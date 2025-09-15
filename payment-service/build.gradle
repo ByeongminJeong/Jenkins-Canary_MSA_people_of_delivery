@@ -19,6 +19,10 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+    // 프로메테우스 메트릭을 위한 의존성 추가
+//    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+//    implementation 'io.micrometer:micrometer-registry-prometheus'
+
     implementation 'org.springframework.kafka:spring-kafka'
 
     compileOnly 'org.projectlombok:lombok'
