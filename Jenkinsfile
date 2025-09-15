@@ -229,8 +229,14 @@ EOF
                 configFileProvider([configFile(fileId: 'all-services', variable: 'CONFIG_FILE')]) {
                     sh '''
                         . $CONFIG_FILE
-                        export ECR_REGISTRY=$${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com
-                        
+
+                        # ECR Registry 설정 (올바른 문법)
+                        ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+                        echo "ECR Registry: $ECR_REGISTRY"
+                        echo "AWS Region: $AWS_REGION"
+                        echo "AWS Account: $AWS_ACCOUNT_ID"
+
                         /usr/local/bin/aws ecr get-login-password --region $AWS_REGION | \\
                             docker login --username AWS --password-stdin $ECR_REGISTRY
                     '''
@@ -244,61 +250,64 @@ EOF
                 configFileProvider([configFile(fileId: 'all-services', variable: 'CONFIG_FILE')]) {
                     sh '''
                         . $CONFIG_FILE
-                        export ECR_REGISTRY=$${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com
-                        
+
+                        # ECR Registry 설정
+                        ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
                         echo "=== 빌드 정보 ==="
                         echo "브랜치: ${BRANCH_NAME_CLEAN}"
                         echo "배포 전략: ${DEPLOYMENT_STRATEGY}"
                         echo "이미지 태그: ${IMAGE_TAG}"
+                        echo "ECR Registry: $ECR_REGISTRY"
 
                         chmod +x ./gradlew
                         ./gradlew clean --no-daemon
-                        
+
                         # 브랜치별 태그 전략 함수
                         apply_deployment_tags() {
-                            local service_name="\$1"
-                            local image_path="$${ECR_REGISTRY}/$${ECR_PREFIX}/${service_name}"
-                            
-                            echo "=== ${service_name} 태그 적용 ==="
+                            local service_name="$1"
+                            local image_path="$ECR_REGISTRY/$ECR_PREFIX/$service_name"
+
+                            echo "=== $service_name 태그 적용 ==="
 
                             case "${DEPLOYMENT_STRATEGY}" in
                                 production)
                                     echo "프로덕션 배포 - latest, stable 태그 추가"
-                                    docker tag $${image_path}:$${IMAGE_TAG} ${image_path}:latest
-                                    docker tag $${image_path}:$${IMAGE_TAG} ${image_path}:stable
-                                    docker push ${image_path}:latest
-                                    docker push ${image_path}:stable
+                                    docker tag $image_path:${IMAGE_TAG} $image_path:latest
+                                    docker tag $image_path:${IMAGE_TAG} $image_path:stable
+                                    docker push $image_path:latest
+                                    docker push $image_path:stable
                                     ;;
                                 canary)
                                     echo "카나리 배포 - canary 태그 추가"
-                                    docker tag $${image_path}:$${IMAGE_TAG} ${image_path}:canary
-                                    docker push ${image_path}:canary
+                                    docker tag $image_path:${IMAGE_TAG} $image_path:canary
+                                    docker push $image_path:canary
                                     ;;
                                 development)
                                     echo "개발 배포 - dev 태그 추가"
-                                    docker tag $${image_path}:$${IMAGE_TAG} ${image_path}:dev
-                                    docker push ${image_path}:dev
+                                    docker tag $image_path:${IMAGE_TAG} $image_path:dev
+                                    docker push $image_path:dev
                                     ;;
                                 feature)
                                     echo "피처 브랜치 - 기본 태그만"
                                     ;;
                             esac
                         }
-                        
+
                         # Auth Service 빌드
                         echo "=== Auth Service 빌드 ==="
                         ./gradlew :auth-service:build -x test --no-daemon
                         docker build -f ./auth-service/Dockerfile \\
-                            -t $${ECR_REGISTRY}/$${ECR_PREFIX}/auth-service:${IMAGE_TAG} .
-                        docker push $${ECR_REGISTRY}/$${ECR_PREFIX}/auth-service:${IMAGE_TAG}
+                            -t $ECR_REGISTRY/$ECR_PREFIX/auth-service:${IMAGE_TAG} .
+                        docker push $ECR_REGISTRY/$ECR_PREFIX/auth-service:${IMAGE_TAG}
                         apply_deployment_tags "auth-service"
 
                         # User Service 빌드
                         echo "=== User Service 빌드 ==="
                         ./gradlew :user-service:build -x test --no-daemon
                         docker build -f ./user-service/Dockerfile \\
-                            -t $${ECR_REGISTRY}/$${ECR_PREFIX}/user-service:${IMAGE_TAG} .
-                        docker push $${ECR_REGISTRY}/$${ECR_PREFIX}/user-service:${IMAGE_TAG}
+                            -t $ECR_REGISTRY/$ECR_PREFIX/user-service:${IMAGE_TAG} .
+                        docker push $ECR_REGISTRY/$ECR_PREFIX/user-service:${IMAGE_TAG}
                         apply_deployment_tags "user-service"
 
                         echo "=== 빌드 완료 ==="
@@ -313,15 +322,18 @@ EOF
                 configFileProvider([configFile(fileId: 'all-services', variable: 'CONFIG_FILE')]) {
                     sh '''
                         . $CONFIG_FILE
-                        export ECR_REGISTRY=$${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com
-                        
+
+                        # ECR Registry 설정 (올바른 문법)
+                        ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
                         echo "=== 배포 전략: ${DEPLOYMENT_STRATEGY} ==="
                         echo "네임스페이스: app (단일 네임스페이스 사용)"
-                        
-                        # sed를 사용한 환경변수 치환 함수 (이미지 정보만 처리)
+                        echo "ECR Registry: $ECR_REGISTRY"
+
+                        # sed를 사용한 환경변수 치환 함수
                         substitute_vars() {
-                            local input_file="\$1"
-                            local output_file="\$2"
+                            local input_file="$1"
+                            local output_file="$2"
 
                             # 카나리 배포에서는 IMAGE_TAG를 "canary"로 고정
                             local ACTUAL_IMAGE_TAG="${IMAGE_TAG}"
@@ -330,20 +342,20 @@ EOF
                                 echo "카나리 배포: 이미지 태그를 'canary'로 설정"
                             fi
 
-                            echo "sed로 환경변수 치환 중: $$input_file -> $$output_file"
-                            echo "사용할 이미지 태그: ${ACTUAL_IMAGE_TAG}"
-                            
-                            # 이미지 관련 변수만 치환 (환경변수는 ConfigMap에서 처리)
-                            sed \\
-                                -e "s|\\${ECR_REGISTRY}|${ECR_REGISTRY}|g" \\
-                                -e "s|\\${ECR_PREFIX}|${ECR_PREFIX}|g" \\
-                                -e "s|\\${IMAGE_TAG}|${ACTUAL_IMAGE_TAG}|g" \\
-                                -e "s|\\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \\
-                                -e "s|\\${AWS_REGION}|${AWS_REGION}|g" \\
-                                -e "s|\\${AWS_ACCOUNT_ID}|${AWS_ACCOUNT_ID}|g" \\
-                                "$$input_file" > "$$output_file"
+                            echo "sed로 환경변수 치환 중: $input_file -> $output_file"
+                            echo "사용할 이미지 태그: $ACTUAL_IMAGE_TAG"
 
-                            echo "치환 완료: $$(wc -l < "$$output_file") 라인"
+                            # 이미지 관련 변수만 치환
+                            sed \\
+                                -e "s|\\${ECR_REGISTRY}|$ECR_REGISTRY|g" \\
+                                -e "s|\\${ECR_PREFIX}|$ECR_PREFIX|g" \\
+                                -e "s|\\${IMAGE_TAG}|$ACTUAL_IMAGE_TAG|g" \\
+                                -e "s|\\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \\
+                                -e "s|\\${AWS_REGION}|$AWS_REGION|g" \\
+                                -e "s|\\${AWS_ACCOUNT_ID}|$AWS_ACCOUNT_ID|g" \\
+                                "$input_file" > "$output_file"
+
+                            echo "치환 완료: $(wc -l < "$output_file") 라인"
                         }
 
                         # 배포 전략별 처리 (모두 app 네임스페이스 사용)
@@ -370,7 +382,7 @@ EOF
                                 echo "2. 기존 Deployment 확인 및 삭제..."
                                 /usr/local/bin/kubectl delete deployment auth-deployment -n app --ignore-not-found
                                 /usr/local/bin/kubectl delete deployment user-deployment -n app --ignore-not-found
-                                
+
                                 # 3. Analysis Templates 먼저 배포
                                 echo "3. Analysis Templates 배포..."
                                 if [ -f "auth-service/auth-service-analysis.yaml" ]; then
@@ -379,18 +391,18 @@ EOF
                                 else
                                     echo "WARNING: auth-service-analysis.yaml 파일을 찾을 수 없습니다"
                                 fi
-                                
+
                                 if [ -f "user-service/user-service-analysis.yaml" ]; then
                                     /usr/local/bin/kubectl apply -f user-service/user-service-analysis.yaml -n app
                                     echo "User Service Analysis Template 배포 완료"
                                 else
                                     echo "WARNING: user-service-analysis.yaml 파일을 찾을 수 없습니다"
                                 fi
-                                
+
                                 # 4. 환경변수 치환 (이미지 정보만)
                                 echo "4. Rollout YAML 준비..."
                                 mkdir -p /tmp/k8s
-                                
+
                                 if [ -f "auth-service/auth-service-rollout.yaml" ]; then
                                     substitute_vars auth-service/auth-service-rollout.yaml /tmp/k8s/auth-rollout.yaml
                                     echo "Auth Service Rollout YAML 준비 완료"
@@ -398,7 +410,7 @@ EOF
                                     echo "ERROR: auth-service-rollout.yaml 파일을 찾을 수 없습니다"
                                     exit 1
                                 fi
-                                
+
                                 if [ -f "user-service/user-service-rollout.yaml" ]; then
                                     substitute_vars user-service/user-service-rollout.yaml /tmp/k8s/user-rollout.yaml
                                     echo "User Service Rollout YAML 준비 완료"
@@ -415,7 +427,7 @@ EOF
                                 else
                                     echo "ERROR: auth-service-services.yaml 파일을 찾을 수 없습니다"
                                 fi
-                                
+
                                 if [ -f "user-service/user-service-services.yaml" ]; then
                                     /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n app
                                     echo "User Service Services 배포 완료"
@@ -432,7 +444,7 @@ EOF
                                     echo "ERROR: Auth Rollout YAML 파일 생성 실패"
                                 fi
 
-                                # 7. User Service 카나리 배포  
+                                # 7. User Service 카나리 배포
                                 echo "7. User Service 카나리 Rollout 배포..."
                                 if [ -f "/tmp/k8s/user-rollout.yaml" ]; then
                                     /usr/local/bin/kubectl apply -f /tmp/k8s/user-rollout.yaml -n app
@@ -477,22 +489,22 @@ EOF
                             development|feature)
                                 echo "=== ${DEPLOYMENT_STRATEGY} 배포 ==="
                                 cd aws/canary-deployment/services
-                                
+
                                 # Ingress 배포
                                 if [ -f "../../eks-app/ingress/app-ingress.yaml" ]; then
                                     /usr/local/bin/kubectl apply -f ../../eks-app/ingress/app-ingress.yaml -n app
                                 fi
-                                
+
                                 # 환경변수 치환
                                 mkdir -p /tmp/k8s
                                 substitute_vars auth-service/auth-service-rollout.yaml /tmp/k8s/auth-rollout.yaml
                                 substitute_vars user-service/user-service-rollout.yaml /tmp/k8s/user-rollout.yaml
-                                
+
                                 /usr/local/bin/kubectl apply -f auth-service/auth-service-services.yaml -n app
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/auth-rollout.yaml -n app
                                 /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n app
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/user-rollout.yaml -n app
-                                
+
                                 echo "${DEPLOYMENT_STRATEGY} 배포 완료 - 통합 ConfigMap/Secret 기반"
                                 ;;
                         esac
