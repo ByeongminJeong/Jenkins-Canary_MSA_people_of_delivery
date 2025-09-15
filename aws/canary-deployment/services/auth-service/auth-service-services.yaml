@@ -13,8 +13,8 @@ spec:
     app: auth
     service: auth-service
   ports:
-    - port: 8015
-      targetPort: 8015
+    - port: 80          # Ingress에서 참조하는 포트
+      targetPort: 8015  # 실제 Pod 포트
       protocol: TCP
       name: http
   type: ClusterIP
@@ -35,8 +35,8 @@ spec:
     app: auth
     service: auth-service
   ports:
-    - port: 8015
-      targetPort: 8015
+    - port: 80          # Ingress에서 참조하는 포트
+      targetPort: 8015  # 실제 Pod 포트
       protocol: TCP
       name: http
   type: ClusterIP
@@ -56,8 +56,8 @@ spec:
     app: auth
     service: auth-service
   ports:
-    - port: 8015
-      targetPort: 8015
+    - port: 80          # Ingress에서 참조하는 포트
+      targetPort: 8015  # 실제 Pod 포트
       protocol: TCP
       name: http
   type: ClusterIP
