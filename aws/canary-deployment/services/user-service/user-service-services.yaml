@@ -1,5 +1,4 @@
----
-# 안정 버전용 서비스
+# Stable Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,19 +6,21 @@ metadata:
   namespace: app
   labels:
     app: user
-    version: stable  # Argo Rollouts 검증용
+    service: user-service
+    version: stable
 spec:
   selector:
     app: user
     service: user-service
   ports:
-  - name: http
-    port: 80
-    targetPort: 8014
+    - port: 8014
+      targetPort: 8014
+      protocol: TCP
+      name: http
   type: ClusterIP
 
 ---
-# 카나리 버전용 서비스
+# Canary Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -27,19 +28,21 @@ metadata:
   namespace: app
   labels:
     app: user
-    version: canary  # Argo Rollouts 검증용
+    service: user-service
+    version: canary
 spec:
   selector:
     app: user
     service: user-service
   ports:
-  - name: http
-    port: 80
-    targetPort: 8014
+    - port: 8014
+      targetPort: 8014
+      protocol: TCP
+      name: http
   type: ClusterIP
 
 ---
-# 메인 서비스
+# Main Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -47,13 +50,14 @@ metadata:
   namespace: app
   labels:
     app: user
-    version: stable  # Argo Rollouts 검증용
+    service: user-service
 spec:
   selector:
     app: user
     service: user-service
   ports:
-  - name: http
-    port: 80
-    targetPort: 8014
+    - port: 8014
+      targetPort: 8014
+      protocol: TCP
+      name: http
   type: ClusterIP

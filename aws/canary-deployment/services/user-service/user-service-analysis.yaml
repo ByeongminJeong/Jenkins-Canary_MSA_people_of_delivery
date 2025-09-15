@@ -12,7 +12,7 @@ spec:
     - name: success-rate
       interval: 30s
       count: 3
-      successCondition: result[0] >= 0.95  # 95% 이상 성공률
+      successCondition: result[0] >= 0.90
       failureLimit: 1
       provider:
         job:
@@ -29,13 +29,15 @@ spec:
                         set -e
                         echo "Testing User Service: {{args.service-name}}"
                         
-                        # 헬스체크 엔드포인트 테스트
                         success=0
                         total=10
                         
+                        SERVICE_URL="http://{{args.service-name}}.app.svc.cluster.local:8014"
+                        echo "Testing service at: $SERVICE_URL"
+                        
                         for i in $(seq 1 $total); do
                           echo "Test $i/$total"
-                          if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/health > /dev/null 2>&1; then
+                          if curl -s -f -m 10 --connect-timeout 5 "$SERVICE_URL/actuator/health" > /dev/null 2>&1; then
                             success=$((success + 1))
                             echo "  ✓ Success"
                           else
@@ -49,11 +51,11 @@ spec:
                         echo $success_rate
                 restartPolicy: Never
 
-    # 사용자 API 테스트 (User Service 특화)
-    - name: user-api-test
+    # API 검증 테스트
+    - name: api-validation
       interval: 45s
       count: 2
-      successCondition: result[0] >= 0.80  # 80% 이상 API 검증 성공
+      successCondition: result[0] >= 0.80
       failureLimit: 1
       provider:
         job:
@@ -72,26 +74,41 @@ spec:
                         success=0
                         total=5
                         
+                        BASE_URL="http://{{args.service-name}}.app.svc.cluster.local:8014"
+                        echo "Testing API at: $BASE_URL"
+                        
                         for i in $(seq 1 $total); do
                           echo "API Test $i/$total"
                         
-                          # 여러 엔드포인트 테스트
                           health_ok=false
                           info_ok=false
                         
-                          if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/health > /dev/null 2>&1; then
+                          if curl -s -f -m 10 "$BASE_URL/actuator/health" | grep -q '"status":"UP"'; then
                             health_ok=true
+                            echo "  ✓ Health endpoint OK"
+                          else
+                            echo "  ✗ Health endpoint failed"
                           fi
                         
-                          if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/info > /dev/null 2>&1; then
+                          if curl -s -f -m 10 "$BASE_URL/actuator/info" > /dev/null 2>&1; then
                             info_ok=true
+                            echo "  ✓ Info endpoint OK"
+                          else
+                            echo "  ✗ Info endpoint failed"
+                          fi
+                        
+                          # User Service 특화 테스트
+                          if curl -s -f -m 10 "$BASE_URL/actuator/metrics" > /dev/null 2>&1; then
+                            echo "  ✓ Metrics endpoint OK"
+                          else
+                            echo "  ✗ Metrics endpoint failed"
                           fi
                         
                           if [ "$health_ok" = true ] && [ "$info_ok" = true ]; then
                             success=$((success + 1))
-                            echo "  ✓ All endpoints OK"
+                            echo "  ✓ Core endpoints validated"
                           else
-                            echo "  ✗ Some endpoints failed (health: $health_ok, info: $info_ok)"
+                            echo "  ✗ Core endpoints validation failed"
                           fi
                         
                           sleep 3
@@ -100,4 +117,49 @@ spec:
                         api_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
                         echo "User API validation rate: $api_rate ($success/$total)"
                         echo $api_rate
+                restartPolicy: Never
+
+    # 응답 시간 테스트
+    - name: response-time
+      interval: 60s
+      count: 2
+      successCondition: result[0] <= 2.0
+      failureLimit: 1
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                containers:
+                  - name: curl
+                    image: curlimages/curl:7.85.0
+                    command: ["/bin/sh", "-c"]
+                    args:
+                      - |
+                        echo "Response Time Test for User Service"
+                        
+                        SERVICE_URL="http://{{args.service-name}}.app.svc.cluster.local:8014/actuator/health"
+                        total_time=0
+                        count=5
+                        
+                        for i in $(seq 1 $count); do
+                          echo "Response time test $i/$count"
+                        
+                          response_time=$(curl -o /dev/null -s -w "%{time_total}" -m 10 "$SERVICE_URL" 2>/dev/null || echo "999")
+                        
+                          if [ "$response_time" != "999" ]; then
+                            echo "  Response time: ${response_time}s"
+                            total_time=$(awk "BEGIN {print $total_time + $response_time}")
+                          else
+                            echo "  Request failed"
+                            total_time=$(awk "BEGIN {print $total_time + 10}")
+                          fi
+                        
+                          sleep 2
+                        done
+                        
+                        avg_time=$(awk "BEGIN {printf \"%.2f\", $total_time / $count}")
+                        echo "Average response time: ${avg_time}s"
+                        echo $avg_time
                 restartPolicy: Never

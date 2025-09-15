@@ -12,31 +12,31 @@ spec:
   strategy:
     canary:
       steps:
-      - setWeight: 10
-      - pause: {duration: 30s}
-      - analysis:
-          templates:
-          - templateName: auth-service-success-rate
-          args:
-          - name: service-name
-            value: auth-service
-      - setWeight: 25
-      - pause: {duration: 60s}
-      - analysis:
-          templates:
-          - templateName: auth-service-success-rate
-          args:
-          - name: service-name
-            value: auth-service
-      - setWeight: 50
-      - pause: {duration: 120s}
-      - analysis:
-          templates:
-          - templateName: auth-service-success-rate
-          args:
-          - name: service-name
-            value: auth-service
-      - setWeight: 100
+        - setWeight: 10
+        - pause: {duration: 30s}
+        - analysis:
+            templates:
+              - templateName: auth-service-success-rate
+            args:
+              - name: service-name
+                value: auth-service-canary
+        - setWeight: 25
+        - pause: {duration: 60s}
+        - analysis:
+            templates:
+              - templateName: auth-service-success-rate
+            args:
+              - name: service-name
+                value: auth-service-canary
+        - setWeight: 50
+        - pause: {duration: 120s}
+        - analysis:
+            templates:
+              - templateName: auth-service-success-rate
+            args:
+              - name: service-name
+                value: auth-service-canary
+        - setWeight: 100
 
       canaryService: auth-service-canary
       stableService: auth-service-stable
@@ -44,7 +44,7 @@ spec:
       trafficRouting:
         alb:
           ingress: app-ingress
-          servicePort: 80
+          servicePort: 8015  # Auth Service는 8015 포트
 
   revisionHistoryLimit: 10
 
@@ -70,86 +70,89 @@ spec:
           operator: "Equal"
           value: "true"
           effect: "NoSchedule"
-      
+
       terminationGracePeriodSeconds: 30
 
       containers:
-      - name: auth-service
-        image: ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:${IMAGE_TAG}
-        ports:
-        - containerPort: 8015
-          name: http
-          protocol: TCP
+        - name: auth-service
+          image: ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:${IMAGE_TAG}
+          ports:
+            - containerPort: 8015
+              name: http
+              protocol: TCP
 
-        # ConfigMap과 Secret에서 환경변수 로드 (optional로 변경)
-        envFrom:
-        - configMapRef:
-            name: app-config
-            optional: true
-        - secretRef:
-            name: app-secrets
-            optional: true
+          # ConfigMap과 Secret에서 환경변수 로드
+          envFrom:
+            - configMapRef:
+                name: app-config
+                optional: true
+            - secretRef:
+                name: app-secrets
+                optional: true
 
-        env:
-        - name: SPRING_PROFILES_ACTIVE
-          value: "prod"
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: SERVER_PORT
+              value: "8015"
+            - name: MANAGEMENT_SERVER_PORT
+              value: "8015"
 
-        # 헬스체크 (HTTP로 변경하여 정확성 향상)
-        startupProbe:
-          httpGet:
-            path: /actuator/health
-            port: 8015
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          failureThreshold: 30
+          # 헬스체크 설정
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8015
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 20
+            timeoutSeconds: 5
 
-        # readiness probe 임시 비활성화 (문제 해결까지)
-        # readinessProbe:
-        #   httpGet:
-        #     path: /actuator/health
-        #     port: 8015
-        #   initialDelaySeconds: 30
-        #   periodSeconds: 5
-        #   failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8015
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 3
 
-        livenessProbe:
-          httpGet:
-            path: /actuator/health
-            port: 8015
-          initialDelaySeconds: 120  # 시간 연장
-          periodSeconds: 60         # 간격 연장
-          failureThreshold: 5       # 실패 허용 증가
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8015
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 3
+            timeoutSeconds: 5
 
-        resources:
-          requests:
-            cpu: "200m"
-            memory: "512Mi"
-          limits:
-            cpu: "1000m"
-            memory: "1Gi"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
 
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          runAsUser: 1000
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
 
-        volumeMounts:
-        - name: tmp-volume
-          mountPath: /tmp
-        - name: logs-volume
-          mountPath: /app/logs
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+            - name: logs-volume
+              mountPath: /app/logs
 
       volumes:
-      - name: tmp-volume
-        emptyDir: {}
-      - name: logs-volume
-        emptyDir: {}
-
-      securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsUser: 1000
+        - name: tmp-volume
+          emptyDir: {}
+        - name: logs-volume
+          emptyDir: {}
