@@ -77,37 +77,42 @@ spec:
           name: http
           protocol: TCP
 
-        # ConfigMap과 Secret에서 환경변수 로드
+        # ConfigMap과 Secret에서 환경변수 로드 (optional로 변경)
         envFrom:
         - configMapRef:
             name: app-config
+            optional: true
         - secretRef:
             name: app-secrets
+            optional: true
 
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: "prod"
 
-        # 헬스체크
+        # 헬스체크 (HTTP로 변경하여 정확성 향상)
         startupProbe:
-          tcpSocket:
+          httpGet:
+            path: /actuator/health
             port: 8014
-          initialDelaySeconds: 120
-          periodSeconds: 30
-          failureThreshold: 20
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          failureThreshold: 30
 
         readinessProbe:
-          tcpSocket:
+          httpGet:
+            path: /actuator/health/readiness
             port: 8014
-          initialDelaySeconds: 150
-          periodSeconds: 30
+          initialDelaySeconds: 30
+          periodSeconds: 5
           failureThreshold: 3
 
         livenessProbe:
-          tcpSocket:
+          httpGet:
+            path: /actuator/health/liveness
             port: 8014
-          initialDelaySeconds: 180
-          periodSeconds: 60
+          initialDelaySeconds: 90
+          periodSeconds: 30
           failureThreshold: 3
 
         resources:

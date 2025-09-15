@@ -11,7 +11,7 @@ metadata:
 spec:
   selector:
     app: user
-    # service: user-service 제거 (Pod에 없는 라벨)
+    service: user-service
   ports:
   - name: http
     port: 80
@@ -31,7 +31,7 @@ metadata:
 spec:
   selector:
     app: user
-    # service: user-service 제거 (Pod에 없는 라벨)
+    service: user-service
   ports:
   - name: http
     port: 80
@@ -51,7 +51,7 @@ metadata:
 spec:
   selector:
     app: user
-    # service: user-service 제거 (Pod에 없는 라벨)
+    service: user-service
   ports:
   - name: http
     port: 80

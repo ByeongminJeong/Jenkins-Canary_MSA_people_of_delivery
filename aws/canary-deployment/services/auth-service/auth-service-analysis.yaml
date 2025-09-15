@@ -11,8 +11,8 @@ spec:
   # HTTP 성공률 체크 (Auth Service 특화)
   - name: success-rate
     interval: 30s
-    count: 2
-    successCondition: result[0] >= 0.90  # 90% 이상 성공률 (Auth는 더 엄격)
+    count: 3
+    successCondition: result[0] >= 0.90  # 90% 이상 성공률
     failureLimit: 1
     provider:
       job:
@@ -26,25 +26,32 @@ spec:
                 args:
                 - |
                   set -e
-                  # 5번 요청해서 성공률 계산 (Auth는 빠른 검증)
+                  echo "Testing Auth Service: {{args.service-name}}"
+                  
+                  # 헬스체크 엔드포인트 테스트
                   success=0
-                  total=5
+                  total=10
                   
                   for i in $(seq 1 $total); do
-                    if curl -s -f http://{{args.service-name}}:80/actuator/health > /dev/null; then
+                    echo "Test $i/$total"
+                    if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/health > /dev/null 2>&1; then
                       success=$((success + 1))
+                      echo "  ✓ Success"
+                    else
+                      echo "  ✗ Failed"
                     fi
-                    sleep 1
+                    sleep 2
                   done
                   
                   success_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
-                  echo "Auth Service Success rate: $success_rate"
+                  echo "Auth Service Success rate: $success_rate ($success/$total)"
                   echo $success_rate
               restartPolicy: Never
-  
-  # API 검증 테스트 (실제 Auth Service API 호출)
+              backoffLimit: 0
+
+  # API 검증 테스트 (Auth Service 특화)
   - name: api-validation
-    interval: 30s
+    interval: 45s
     count: 2
     successCondition: result[0] >= 0.80  # 80% 이상 API 검증 성공
     failureLimit: 1
@@ -59,20 +66,38 @@ spec:
                 command: ["/bin/sh", "-c"]
                 args:
                 - |
-                  # Auth Service 헬스체크 및 기본 API 테스트
+                  echo "API Validation for Auth Service: {{args.service-name}}"
+                  
                   success=0
-                  total=3
+                  total=5
                   
                   for i in $(seq 1 $total); do
-                    # 헬스체크와 기본 API 응답 확인
-                    if curl -s -f http://{{args.service-name}}:80/actuator/health > /dev/null && \
-                       curl -s -f http://{{args.service-name}}:80/actuator/info > /dev/null; then
-                      success=$((success + 1))
+                    echo "API Test $i/$total"
+                    
+                    # 여러 엔드포인트 테스트
+                    health_ok=false
+                    info_ok=false
+                    
+                    if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/health > /dev/null 2>&1; then
+                      health_ok=true
                     fi
-                    sleep 1
+                    
+                    if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/info > /dev/null 2>&1; then
+                      info_ok=true
+                    fi
+                    
+                    if [ "$health_ok" = true ] && [ "$info_ok" = true ]; then
+                      success=$((success + 1))
+                      echo "  ✓ All endpoints OK"
+                    else
+                      echo "  ✗ Some endpoints failed (health: $health_ok, info: $info_ok)"
+                    fi
+                    
+                    sleep 3
                   done
                   
                   api_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
-                  echo "Auth API validation rate: $api_rate"
+                  echo "Auth API validation rate: $api_rate ($success/$total)"
                   echo $api_rate
               restartPolicy: Never
+              backoffLimit: 0

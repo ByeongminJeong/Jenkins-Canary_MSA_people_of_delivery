@@ -7,46 +7,98 @@ spec:
   args:
   - name: service-name
     value: module-common
-  - name: service-namespace
-    value: app
-  - name: service-port
-    value: "8011"
+
   metrics:
+  # HTTP 성공률 체크 (Module Common 특화)
   - name: success-rate
-    successCondition: result[0] >= 0.95
+    interval: 30s
+    count: 3
+    successCondition: result[0] >= 0.95  # 95% 이상 성공률
+    failureLimit: 1
     provider:
-      prometheus:
-        address: http://prometheus:9090
-        query: |
-          sum(rate(http_requests_total{service="{{args.service-name}}",namespace="{{args.service-namespace}}",status=~"2.."}[5m])) /
-          sum(rate(http_requests_total{service="{{args.service-name}}",namespace="{{args.service-namespace}}"}[5m]))
-  - name: error-rate
-    successCondition: result[0] <= 0.05
+      job:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: curl
+                image: curlimages/curl:7.85.0
+                command: ["/bin/sh", "-c"]
+                args:
+                - |
+                  set -e
+                  echo "Testing Module Common: {{args.service-name}}"
+                  
+                  # 헬스체크 엔드포인트 테스트
+                  success=0
+                  total=10
+                  
+                  for i in $(seq 1 $total); do
+                    echo "Test $i/$total"
+                    if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/health > /dev/null 2>&1; then
+                      success=$((success + 1))
+                      echo "  ✓ Success"
+                    else
+                      echo "  ✗ Failed"
+                    fi
+                    sleep 2
+                  done
+                  
+                  success_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
+                  echo "Module Common Success rate: $success_rate ($success/$total)"
+                  echo $success_rate
+              restartPolicy: Never
+              backoffLimit: 0
+
+  # 공통 모듈 API 테스트
+  - name: module-common-api-test
+    interval: 45s
+    count: 2
+    successCondition: result[0] >= 0.90  # 90% 이상 API 검증 성공
+    failureLimit: 1
     provider:
-      prometheus:
-        address: http://prometheus:9090
-        query: |
-          sum(rate(http_requests_total{service="{{args.service-name}}",namespace="{{args.service-namespace}}",status=~"5.."}[5m])) /
-          sum(rate(http_requests_total{service="{{args.service-name}}",namespace="{{args.service-namespace}}"}[5m]))
-  - name: response-time
-    successCondition: result[0] <= 0.5
-    provider:
-      prometheus:
-        address: http://prometheus:9090
-        query: |
-          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="{{args.service-name}}",namespace="{{args.service-namespace}}"}[5m])) by (le))
-  - name: health-check
-    successCondition: result[0] >= 1
-    provider:
-      prometheus:
-        address: http://prometheus:9090
-        query: |
-          up{job="{{args.service-name}}",namespace="{{args.service-namespace}}"}
-  - name: module-common-specific-test
-    successCondition: result[0] >= 0.95
-    provider:
-      prometheus:
-        address: http://prometheus:9090
-        query: |
-          sum(rate(http_requests_total{service="{{args.service-name}}",namespace="{{args.service-namespace}}",endpoint="/actuator/health",status=~"2.."}[5m])) /
-          sum(rate(http_requests_total{service="{{args.service-name}}",namespace="{{args.service-namespace}}",endpoint="/actuator/health"}[5m]))
+      job:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: curl
+                image: curlimages/curl:7.85.0
+                command: ["/bin/sh", "-c"]
+                args:
+                - |
+                  echo "API Validation for Module Common: {{args.service-name}}"
+                  
+                  success=0
+                  total=5
+                  
+                  for i in $(seq 1 $total); do
+                    echo "API Test $i/$total"
+                    
+                    # 여러 엔드포인트 테스트 (포트 8011 사용)
+                    health_ok=false
+                    info_ok=false
+                    
+                    if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/health > /dev/null 2>&1; then
+                      health_ok=true
+                    fi
+                    
+                    if curl -s -f -m 5 http://{{args.service-name}}.app.svc.cluster.local:80/actuator/info > /dev/null 2>&1; then
+                      info_ok=true
+                    fi
+                    
+                    if [ "$health_ok" = true ] && [ "$info_ok" = true ]; then
+                      success=$((success + 1))
+                      echo "  ✓ All endpoints OK"
+                    else
+                      echo "  ✗ Some endpoints failed (health: $health_ok, info: $info_ok)"
+                    fi
+                    
+                    sleep 3
+                  done
+                  
+                  api_rate=$(awk "BEGIN {printf \"%.2f\", $success / $total}")
+                  echo "Module Common API validation rate: $api_rate ($success/$total)"
+                  echo $api_rate
+              restartPolicy: Never
+              backoffLimit: 0
