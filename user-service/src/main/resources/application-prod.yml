@@ -19,6 +19,7 @@ management:
 
 logging:
   level:
+    com.example.cloudfour.modulecommon.util.PassportUtil: DEBUG
     org.springframework.cloud.gateway: WARN
     reactor.netty: WARN
     root: WARN
