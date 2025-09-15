@@ -24,14 +24,28 @@ spec:
       paths:
       - backend:
           service:
-            name: auth-service
+            name: auth-service-stable  # stable 서비스 참조
             port:
               number: 80
         path: /auth
         pathType: Prefix
       - backend:
           service:
-            name: user-service
+            name: auth-service-canary  # canary 서비스 추가!
+            port:
+              number: 80
+        path: /auth
+        pathType: Prefix
+      - backend:
+          service:
+            name: user-service-stable  # stable 서비스 참조
+            port:
+              number: 80
+        path: /users
+        pathType: Prefix
+      - backend:
+          service:
+            name: user-service-canary  # canary 서비스 추가!
             port:
               number: 80
         path: /users

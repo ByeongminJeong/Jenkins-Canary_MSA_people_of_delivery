@@ -429,19 +429,21 @@ pipeline {
                                     fi
 
                                     # 5. Services 배포
-                                    echo "5. Services 배포..."
-                                    if [ -f "auth-service/auth-service-services.yaml" ]; then
-                                        /usr/local/bin/kubectl apply -f auth-service/auth-service-services.yaml -n app
-                                        echo "Auth Service Services 배포 완료"
-                                    else
-                                        echo "ERROR: auth-service-services.yaml 파일을 찾을 수 없습니다"
-                                    fi
-
-                                    if [ -f "user-service/user-service-services.yaml" ]; then
-                                        /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n app
-                                        echo "User Service Services 배포 완료"
                                     else
                                         echo "ERROR: user-service-services.yaml 파일을 찾을 수 없습니다"
+                                    fi
+
+                                    # Services가 Ready 상태가 될 때까지 대기
+                                    echo "Services 준비 대기 중..."
+                                    sleep 10
+
+                                    # 1. Ingress 나중에 배포 (Services 생성 후)
+                                    echo "1. Ingress 배포 중..."
+                                    if [ -f "../../eks-app/ingress/app-ingress.yaml" ]; then
+                                        /usr/local/bin/kubectl apply -f ../../eks-app/ingress/app-ingress.yaml -n app
+                                        echo "Ingress 배포 완료"
+                                    else
+                                        echo "WARNING: Ingress 파일을 찾을 수 없습니다"
                                     fi
 
                                     # 6. Auth Service 카나리 배포

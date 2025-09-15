@@ -15,8 +15,14 @@ management:
         include: health,info,prometheus
   endpoint:
     health:
+      probes:
+        enabled: true          # 🔥 중요! readiness/liveness 엔드포인트 활성화
       show-details: always     # 상세 정보 표시
   health:
+    readinessstate:
+      enabled: true            # readiness state 활성화
+    livenessstate:
+      enabled: true            # liveness state 활성화
     db:
       enabled: false           # DB 체크 비활성화
     redis:

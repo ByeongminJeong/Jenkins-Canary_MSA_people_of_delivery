@@ -40,7 +40,7 @@ spec:
 
       canaryService: user-service-canary
       stableService: user-service-stable
-      
+
       trafficRouting:
         alb:
           ingress: app-ingress
