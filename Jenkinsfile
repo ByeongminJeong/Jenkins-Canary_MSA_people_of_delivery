@@ -27,7 +27,37 @@ pipeline {
                     // 이미지 태그 생성
                     def imageTag
                     def deploymentStrategy
+# sed를 사용한 환경변수 치환 함수
+substitute_vars() {
+    local input_file="$1"
+    local output_file="$2"
 
+    # 카나리 배포에서는 IMAGE_TAG를 "canary"로 고정
+    local ACTUAL_IMAGE_TAG="${IMAGE_TAG}"
+    if [ "${DEPLOYMENT_STRATEGY}" = "canary" ]; then
+        ACTUAL_IMAGE_TAG="canary"
+        echo "카나리 배포: 이미지 태그를 'canary'로 설정"
+    fi
+
+    echo "sed로 환경변수 치환 중: $input_file -> $output_file"
+    echo "ECR_REGISTRY: $ECR_REGISTRY"
+    echo "ECR_PREFIX: $ECR_PREFIX"
+    echo "사용할 이미지 태그: $ACTUAL_IMAGE_TAG"
+
+    # 환경변수 치환 (정확한 패턴)
+    sed \\
+        -e "s|\\\${ECR_REGISTRY}|$ECR_REGISTRY|g" \\
+        -e "s|\\\${ECR_PREFIX}|$ECR_PREFIX|g" \\
+        -e "s|\\\${IMAGE_TAG}|$ACTUAL_IMAGE_TAG|g" \\
+        -e "s|\\\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \\
+        -e "s|\\\${AWS_REGION}|$AWS_REGION|g" \\
+        -e "s|\\\${AWS_ACCOUNT_ID}|$AWS_ACCOUNT_ID|g" \\
+        "$input_file" > "$output_file"
+
+    echo "치환 완료: $(wc -l < "$output_file") 라인"
+    echo "치환된 이미지 확인:"
+    grep -E "image:" "$output_file" || true
+}
                     if (branchNameClean in ['main', 'master']) {
                         imageTag = "v${env.GIT_COMMIT_SHORT}"
                         deploymentStrategy = "production"
