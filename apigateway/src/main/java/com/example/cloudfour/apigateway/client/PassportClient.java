@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 @Lazy
 @FeignClient(
     name = "auth-service",
-    url = "http://localhost:8015",
+    url = "http://auth-service.app.svc.cluster.local:80/internal/auth",
     configuration = FeignConfig.class
 )
 public interface PassportClient {
