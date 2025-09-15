@@ -75,7 +75,7 @@ spec:
 
       containers:
       - name: user-service
-        image: 061039771693.dkr.ecr.ap-northeast-2.amazonaws.com/peopleofdelivery/user-service:canary
+        image: ${ECR_REGISTRY}/${ECR_PREFIX}/user-service:${IMAGE_TAG}
         ports:
         - containerPort: 8014
           name: http

@@ -75,7 +75,7 @@ spec:
 
       containers:
       - name: auth-service
-        image: 061039771693.dkr.ecr.ap-northeast-2.amazonaws.com/peopleofdelivery/auth-service:canary
+        image: ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:${IMAGE_TAG}
         ports:
         - containerPort: 8015
           name: http
