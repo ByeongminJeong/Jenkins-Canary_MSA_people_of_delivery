@@ -8,16 +8,10 @@ management:
         include: health,info,prometheus
   endpoint:
     health:
-      probes:
-        enabled: true          # 🔥 중요! readiness/liveness 엔드포인트 활성화
       show-details: always
     prometheus:
       enabled: true
   health:
-    readinessstate:
-      enabled: true            # readiness state 활성화
-    livenessstate:
-      enabled: true            # liveness state 활성화
     db:
       enabled: false           # DB 체크 비활성화
     redis:
@@ -26,6 +20,7 @@ management:
 logging:
   level:
     com.example.cloudfour.modulecommon.util.PassportUtil: DEBUG
+    org.apache.kafka.clients.NetworkClient: ERROR
     org.springframework.cloud.gateway: WARN
     reactor.netty: WARN
     root: WARN
@@ -59,8 +54,6 @@ spring:
 
   cloud:
     config:
-      enabled: false
-    discovery:
       enabled: false
 
   data:

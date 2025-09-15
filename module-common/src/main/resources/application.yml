@@ -1,12 +1,26 @@
 server:
   port: 8011
 
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always     # 상세 정보 표시
+  health:
+    db:
+      enabled: false           # DB 체크 비활성화
+    redis:
+      enabled: false
+
+
 spring:
   application:
     name: module-common
-  batch:
-      job:
-        enabled: false
+
   jpa:
     hibernate.ddl-auto: update
     show-sql: true
@@ -15,42 +29,49 @@ spring:
         format_sql: true
         highlight_sql: true
 
-#  eureka:
-#    instance:
-#      prefer-ip-address: true
-#    client:
-#      register-with-eureka: true
-#      fetch-registry: true
-#      serviceUrl:
-#        defaultZone: http://localhost:8761/eureka/
+
+  spring:
+    batch:
+      job:
+        enabled: false
+
 
   datasource:
-    url: ${LOCAL_DB_URL}
+    url: ${DB_URL}
     driver-class-name: org.postgresql.Driver
-    username: ${LOCAL_DB_USERNAME}
-    password: ${LOCAL_DB_PASSWORD}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
   cloud:
     config:
       enabled: false
 
-kafka:
-  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-  producer:
-    key-serializer: org.apache.kafka.common.serialization.StringSerializer
-    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-    acks: all
-    retries: 3
-    batch-size: 16384
-    linger-ms: 10
-    buffer-memory: 33554432
-  consumer:
-    group-id: module-common-group
-    auto-offset-reset: earliest
-    key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-    value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-    enable-auto-commit: false
+  config:
+    activate:
+      on-profile: msk
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     properties:
-      spring.json.trusted.packages: "*"
+      security.protocol: PLAINTEXT   # <- 유일한 보안 관련 설정
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      batch-size: 16384
+      buffer-memory: 33554432
+      properties:
+        linger.ms: 10
+    consumer:
+      group-id: module-common-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+# 앱 전용(토픽 이름) — 기존 키 유지
+kafka:
   topics:
     orderEvents: order.events.v1
     orderCommands: order.commands.v1
@@ -65,4 +86,3 @@ kafka:
     inventoryCommandsDLQ: inventory.commands.dlq.v1
     paymentEventsDLQ: payment.events.dlq.v1
     paymentCommandsDLQ: payment.commands.dlq.v1
-
