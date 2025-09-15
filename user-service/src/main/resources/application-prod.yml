@@ -60,6 +60,8 @@ spring:
   cloud:
     config:
       enabled: false
+    discovery:
+      enabled: false
 
   data:
     redis:
