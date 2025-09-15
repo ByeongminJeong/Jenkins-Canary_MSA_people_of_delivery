@@ -429,8 +429,21 @@ pipeline {
                                     fi
 
                                     # 5. Services 배포
+                                    echo "5. Services 배포..."
+                                    if [ -f "auth-service/auth-service-services.yaml" ]; then
+                                        /usr/local/bin/kubectl apply -f auth-service/auth-service-services.yaml -n app
+                                        echo "Auth Service Services 배포 완료"
+                                    else
+                                        echo "ERROR: auth-service-services.yaml 파일을 찾을 수 없습니다"
+                                        exit 1
+                                    fi
+
+                                    if [ -f "user-service/user-service-services.yaml" ]; then
+                                        /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n app
+                                        echo "User Service Services 배포 완료"
                                     else
                                         echo "ERROR: user-service-services.yaml 파일을 찾을 수 없습니다"
+                                        exit 1
                                     fi
 
                                     # Services가 Ready 상태가 될 때까지 대기
