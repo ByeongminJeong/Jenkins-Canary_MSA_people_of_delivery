@@ -84,6 +84,10 @@ spec:
         - secretRef:
             name: app-secrets
 
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "prod"
+
         # 헬스체크 (TCP로 변경하여 안정성 향상)
         startupProbe:
           tcpSocket:

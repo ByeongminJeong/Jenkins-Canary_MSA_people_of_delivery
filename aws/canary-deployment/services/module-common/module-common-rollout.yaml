@@ -76,6 +76,9 @@ spec:
 
         # 환경변수 설정 - Jenkins 파이프라인과 일치하도록 수정
         env:
+        # Spring 프로파일 설정
+        - name: SPRING_PROFILES_ACTIVE
+          value: "prod"
         # 데이터베이스 설정
         - name: SPRING_DATASOURCE_URL
           valueFrom:
