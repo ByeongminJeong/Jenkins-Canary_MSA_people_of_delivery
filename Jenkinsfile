@@ -343,19 +343,23 @@ EOF
                             fi
 
                             echo "sed로 환경변수 치환 중: $input_file -> $output_file"
+                            echo "ECR_REGISTRY: $ECR_REGISTRY"
+                            echo "ECR_PREFIX: $ECR_PREFIX"
                             echo "사용할 이미지 태그: $ACTUAL_IMAGE_TAG"
 
-                            # 이미지 관련 변수만 치환
-                            sed \\
-                                -e "s|\\${ECR_REGISTRY}|$ECR_REGISTRY|g" \\
-                                -e "s|\\${ECR_PREFIX}|$ECR_PREFIX|g" \\
-                                -e "s|\\${IMAGE_TAG}|$ACTUAL_IMAGE_TAG|g" \\
-                                -e "s|\\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \\
-                                -e "s|\\${AWS_REGION}|$AWS_REGION|g" \\
-                                -e "s|\\${AWS_ACCOUNT_ID}|$AWS_ACCOUNT_ID|g" \\
+                            # 환경변수 치환
+                            sed \
+                                -e "s|\${ECR_REGISTRY}|$ECR_REGISTRY|g" \
+                                -e "s|\${ECR_PREFIX}|$ECR_PREFIX|g" \
+                                -e "s|\${IMAGE_TAG}|$ACTUAL_IMAGE_TAG|g" \
+                                -e "s|\${DEPLOYMENT_STRATEGY}|${DEPLOYMENT_STRATEGY}|g" \
+                                -e "s|\${AWS_REGION}|$AWS_REGION|g" \
+                                -e "s|\${AWS_ACCOUNT_ID}|$AWS_ACCOUNT_ID|g" \
                                 "$input_file" > "$output_file"
 
                             echo "치환 완료: $(wc -l < "$output_file") 라인"
+                            echo "치환된 이미지 확인:"
+                            grep -E "image:" "$output_file" || true
                         }
 
                         # 배포 전략별 처리 (모두 app 네임스페이스 사용)
