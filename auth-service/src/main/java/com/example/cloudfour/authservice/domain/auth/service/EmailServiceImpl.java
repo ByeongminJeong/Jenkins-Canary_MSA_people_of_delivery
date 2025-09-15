@@ -1,6 +1,5 @@
 package com.example.cloudfour.authservice.domain.auth.service;
 
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +14,6 @@ public class EmailServiceImpl implements EmailService {
     private final JavaMailSender emailSender;
 
     @Override
-    @CircuitBreaker(name="smtp")
     public void sendSimpleMessage(String toEmail, String title, String content) throws MessagingException {
         MimeMessage message = emailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true);
