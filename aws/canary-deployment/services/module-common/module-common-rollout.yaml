@@ -57,6 +57,10 @@ spec:
       labels:
         app: module-common
         version: "v1.0.0"
+#      annotations:
+#        prometheus.io/scrape: "true"
+#        prometheus.io/port: "8011"
+#        prometheus.io/path: "/actuator/prometheus"
     spec:
       # Node Selector & Tolerations
       nodeSelector:

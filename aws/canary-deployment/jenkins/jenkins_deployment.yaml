@@ -16,6 +16,14 @@ spec:
         app: jenkins
     spec:
       serviceAccountName: jenkins
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: system-ng
+        workload: system
+      tolerations:
+        - key: "system"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
       securityContext:
         runAsUser: 0
         fsGroup: 0
@@ -96,4 +104,3 @@ spec:
       - name: jenkins-home
         persistentVolumeClaim:
           claimName: jenkins-pv-claim
-

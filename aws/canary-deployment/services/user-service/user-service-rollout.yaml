@@ -58,6 +58,10 @@ spec:
       labels:
         app: user
         service: user-service
+#      annotations:
+#        prometheus.io/scrape: "true"
+#        prometheus.io/port: "8014"
+#        prometheus.io/path: "/actuator/prometheus"
     spec:
       nodeSelector:
         eks.amazonaws.com/nodegroup: app-ng

@@ -1,0 +1,229 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      # 기본 프로메테우스 설정
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # Kubernetes Pod Discovery - 어노테이션 기반 자동 발견
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - app
+        relabel_configs:
+          # prometheus.io/scrape: "true" 어노테이션이 있는 Pod만 수집
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          
+          # prometheus.io/path 어노테이션에서 경로 가져오기
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          # path 어노테이션이 없으면 기본값 설정
+          - target_label: __metrics_path__
+            replacement: /actuator/prometheus
+            regex: ^$
+          
+          # prometheus.io/port 어노테이션에서 포트 가져오기
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          
+          # Pod 이름을 instance 라벨로 설정
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: instance
+          
+          # 네임스페이스 라벨 추가
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          
+          # Pod 이름 라벨 추가
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+          
+          # 서비스 라벨 추가 (service 라벨에서 가져오기)
+          - source_labels: [__meta_kubernetes_pod_label_service]
+            action: replace
+            target_label: service
+
+      # auth-service 설정
+      - job_name: 'auth-service'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - app
+        relabel_configs:
+          # app=auth 라벨을 가진 Pod만 선택
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: auth
+          
+          # prometheus.io/scrape: "true" 어노테이션 확인
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          
+          # 포트를 8015로 설정
+          - source_labels: [__address__]
+            action: replace
+            regex: ([^:]+)(?::\d+)?
+            replacement: $1:8015
+            target_label: __address__
+          
+          # 메트릭 경로 설정
+          - target_label: __metrics_path__
+            replacement: /actuator/prometheus
+          
+          # 서비스 라벨 설정
+          - target_label: service
+            replacement: auth-service
+
+      # user-service 설정
+      - job_name: 'user-service'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - app
+        relabel_configs:
+          # app=user 라벨을 가진 Pod만 선택
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: user
+          
+          # prometheus.io/scrape: "true" 어노테이션 확인
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          
+          # 포트를 8014로 설정
+          - source_labels: [__address__]
+            action: replace
+            regex: ([^:]+)(?::\d+)?
+            replacement: $1:8014
+            target_label: __address__
+          
+          # 메트릭 경로 설정
+          - target_label: __metrics_path__
+            replacement: /actuator/prometheus
+          
+          # 서비스 라벨 설정
+          - target_label: service
+            replacement: user-service
+
+      # cart-service 설정
+#      - job_name: 'cart-service'
+#        kubernetes_sd_configs:
+#          - role: pod
+#            namespaces:
+#              names:
+#                - app
+#        relabel_configs:
+#          - source_labels: [__meta_kubernetes_pod_label_app]
+#            action: keep
+#            regex: cart
+#          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+#            action: keep
+#            regex: true
+#          - source_labels: [__address__]
+#            action: replace
+#            regex: ([^:]+)(?::\d+)?
+#            replacement: $1:8012
+#            target_label: __address__
+#          - target_label: __metrics_path__
+#            replacement: /actuator/prometheus
+#          - target_label: service
+#            replacement: cart-service
+
+      # store-service 설정
+#      - job_name: 'store-service'
+#        kubernetes_sd_configs:
+#          - role: pod
+#            namespaces:
+#              names:
+#                - app
+#        relabel_configs:
+#          - source_labels: [__meta_kubernetes_pod_label_app]
+#            action: keep
+#            regex: store
+#          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+#            action: keep
+#            regex: true
+#          - source_labels: [__address__]
+#            action: replace
+#            regex: ([^:]+)(?::\d+)?
+#            replacement: $1:8013
+#            target_label: __address__
+#          - target_label: __metrics_path__
+#            replacement: /actuator/prometheus
+#          - target_label: service
+#            replacement: store-service
+
+      # payment-service 설정
+#      - job_name: 'payment-service'
+#        kubernetes_sd_configs:
+#          - role: pod
+#            namespaces:
+#              names:
+#                - app
+#        relabel_configs:
+#          - source_labels: [__meta_kubernetes_pod_label_app]
+#            action: keep
+#            regex: payment
+#          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+#            action: keep
+#            regex: true
+#          - source_labels: [__address__]
+#            action: replace
+#            regex: ([^:]+)(?::\d+)?
+#            replacement: $1:8016
+#            target_label: __address__
+#          - target_label: __metrics_path__
+#            replacement: /actuator/prometheus
+#          - target_label: service
+#            replacement: payment-service
+
+      # ai-service 설정
+#      - job_name: 'ai-service'
+#        kubernetes_sd_configs:
+#          - role: pod
+#            namespaces:
+#              names:
+#                - app
+#        relabel_configs:
+#          - source_labels: [__meta_kubernetes_pod_label_app]
+#            action: keep
+#            regex: ai
+#          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+#            action: keep
+#            regex: true
+#          - source_labels: [__address__]
+#            action: replace
+#            regex: ([^:]+)(?::\d+)?
+#            replacement: $1:8017
+#            target_label: __address__
+#          - target_label: __metrics_path__
+#            replacement: /actuator/prometheus
+#          - target_label: service
+#            replacement: ai-service
+
