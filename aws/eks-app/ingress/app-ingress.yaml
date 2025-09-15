@@ -20,33 +20,19 @@ metadata:
 spec:
   ingressClassName: alb
   rules:
-  - http:
-      paths:
-      - backend:
-          service:
-            name: auth-service-stable  # stable 서비스 참조
-            port:
-              number: 80
-        path: /auth
-        pathType: Prefix
-      - backend:
-          service:
-            name: auth-service-canary  # canary 서비스 추가!
-            port:
-              number: 80
-        path: /auth
-        pathType: Prefix
-      - backend:
-          service:
-            name: user-service-stable  # stable 서비스 참조
-            port:
-              number: 80
-        path: /users
-        pathType: Prefix
-      - backend:
-          service:
-            name: user-service-canary  # canary 서비스 추가!
-            port:
-              number: 80
-        path: /users
-        pathType: Prefix
+    - http:
+        paths:
+          - backend:
+              service:
+                name: auth-service-stable  # Rollouts가 stable/canary 트래픽 분산 관리
+                port:
+                  number: 80
+            path: /auth
+            pathType: Prefix
+          - backend:
+              service:
+                name: user-service-stable  # Rollouts가 stable/canary 트래픽 분산 관리
+                port:
+                  number: 80
+            path: /users
+            pathType: Prefix

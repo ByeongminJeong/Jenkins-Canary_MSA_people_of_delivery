@@ -44,7 +44,7 @@ spec:
       trafficRouting:
         alb:
           ingress: app-ingress
-          servicePort: 8014  # User Service는 8014 포트
+          servicePort: 80  # ✅ 80으로 수정 (서비스 포트와 일치)
 
   revisionHistoryLimit: 10
 
@@ -77,7 +77,7 @@ spec:
         - name: user-service
           image: ${ECR_REGISTRY}/${ECR_PREFIX}/user-service:${IMAGE_TAG}
           ports:
-            - containerPort: 8014
+            - containerPort: 8014  # Pod 포트는 8014 유지
               name: http
               protocol: TCP
 
