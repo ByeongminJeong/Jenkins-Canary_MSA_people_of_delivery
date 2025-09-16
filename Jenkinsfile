@@ -218,13 +218,57 @@ EOF
                                 echo "=== 카나리 배포 (ALB 최적화) ==="
                                 cd aws/canary-deployment/services
 
+                                # 현재 디렉토리 및 파일 구조 확인
+                                echo "현재 작업 디렉토리: $(pwd)"
+                                echo "파일 구조 확인:"
+                                ls -la ../../eks-app/services/ || echo "../../eks-app/services/ 경로 확인 실패"
+                                find ../../.. -name "*service*.yaml" -path "*/eks-app/services/*" || echo "eks-app 서비스 파일 검색 실패"
+
                                 # 1. Services 먼저 배포 (ALB 대상그룹 생성)
                                 echo "1. Services 배포..."
-                                /usr/local/bin/kubectl apply -f ../../eks-app/services/auth-service.yaml -n app
-                                /usr/local/bin/kubectl apply -f ../../eks-app/services/user-service.yaml -n app
 
-                                echo "Services 상태:"
-                                /usr/local/bin/kubectl get svc -n app | grep -E "(auth|user)"
+                                # 절대 경로로 수정하여 확실히 찾을 수 있도록 함
+                                if [ -f "../../eks-app/services/auth-service.yaml" ]; then
+                                    echo "eks-app의 auth-service.yaml 사용"
+                                    /usr/local/bin/kubectl apply -f ../../eks-app/services/auth-service.yaml -n app
+                                    echo "Auth Service (stable/canary) 배포 완료"
+                                else
+                                    echo "../../eks-app/services/auth-service.yaml 파일을 찾을 수 없습니다."
+                                    echo "현재 위치에서 auth-service 파일 검색:"
+                                    find . -name "*auth*service*.yaml" -type f
+                                    echo "루트에서 auth-service 파일 검색:"
+                                    find ../../.. -name "auth-service.yaml" -type f
+
+                                    # 대체 경로 시도
+                                    if [ -f "auth-service/auth-service-services.yaml" ]; then
+                                        echo "대체 파일 사용: auth-service/auth-service-services.yaml"
+                                        /usr/local/bin/kubectl apply -f auth-service/auth-service-services.yaml -n app
+                                    else
+                                        echo "ERROR: auth-service 파일을 찾을 수 없습니다"
+                                        exit 1
+                                    fi
+                                fi
+
+                                if [ -f "../../eks-app/services/user-service.yaml" ]; then
+                                    echo "eks-app의 user-service.yaml 사용"
+                                    /usr/local/bin/kubectl apply -f ../../eks-app/services/user-service.yaml -n app
+                                    echo "User Service (stable/canary) 배포 완료"
+                                else
+                                    echo "../../eks-app/services/user-service.yaml 파일을 찾을 수 없습니다."
+                                    echo "현재 위치에서 user-service 파일 검색:"
+                                    find . -name "*user*service*.yaml" -type f
+                                    echo "루트에서 user-service 파일 검색:"
+                                    find ../../.. -name "user-service.yaml" -type f
+
+                                    # 대체 경로 시도
+                                    if [ -f "user-service/user-service-services.yaml" ]; then
+                                        echo "대체 파일 사용: user-service/user-service-services.yaml"
+                                        /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n app
+                                    else
+                                        echo "ERROR: user-service 파일을 찾을 수 없습니다"
+                                        exit 1
+                                    fi
+                                fi
 
                                 # 2. ALB 대기
                                 echo "2. ALB Controller 대기 (30초)..."
