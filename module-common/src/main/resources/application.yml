@@ -47,14 +47,14 @@ spring:
 
   config:
     activate:
-      on-profile: msk
+      on-profile: production
 
   kafka:
     admin:
       auto-create: true
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     properties:
-      security.protocol: PLAINTEXT   # <- 유일한 보안 관련 설정
+      security.protocol: PLAINTEXT
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer

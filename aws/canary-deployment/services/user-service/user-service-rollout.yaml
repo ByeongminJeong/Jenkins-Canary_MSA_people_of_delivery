@@ -153,22 +153,30 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: DOMAIN
-            # 🔥 기존 Kafka 환경변수
+            # 🔥 Kafka 환경변수 (AWS 표준 사용)
             - name: KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
                 configMapKeyRef:
                   name: app-config
                   key: KAFKA_BOOTSTRAP_SERVERS
-            # ✨ 추가: Spring Boot 표준 환경변수
-            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+            # ✨ Kafka 헬스 체크 비활성화
+            - name: MANAGEMENT_HEALTH_KAFKA_ENABLED
               valueFrom:
                 configMapKeyRef:
                   name: app-config
-                  key: SPRING_KAFKA_BOOTSTRAP_SERVERS
-            # ✨ 추가: Kafka 헬스 체크 비활성화
-            - name: MANAGEMENT_HEALTH_KAFKA_ENABLED
-              value: "false"
-            # ✨ 추가: Java 옵션 (추가 보장)
+                  key: MANAGEMENT_HEALTH_KAFKA_ENABLED
+            # ✨ Kafka Consumer 설정
+            - name: SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET
+            - name: SPRING_KAFKA_CONSUMER_ENABLE_AUTO_COMMIT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SPRING_KAFKA_CONSUMER_ENABLE_AUTO_COMMIT
+            # ✨ Java 옵션 (AWS 표준 사용)
             - name: JAVA_OPTS
               value: "-Dspring.kafka.bootstrap-servers=$(KAFKA_BOOTSTRAP_SERVERS) -Dmanagement.health.kafka.enabled=false"
           livenessProbe:
