@@ -87,7 +87,7 @@ pipeline {
 
                         # ✨ 수정된 ConfigMap 생성 (Spring Boot 표준 Kafka 환경변수 포함)
                         cat > /tmp/k8s-config/app-config.properties << EOF
-SPRING_PROFILES_ACTIVE=production,msk
+SPRING_PROFILES_ACTIVE=prod,msk
 DEPLOYMENT_STRATEGY=${DEPLOYMENT_STRATEGY}
 SPRING_DATASOURCE_URL=${DB_URL}
 SPRING_REDIS_HOST=${REDIS_HOST}
