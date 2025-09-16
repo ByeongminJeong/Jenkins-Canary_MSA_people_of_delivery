@@ -158,13 +158,25 @@ EOF
             }
         }
 
-        stage('Build Services') {
+        stage('Build and Deploy Services') {
             steps {
                 configFileProvider([configFile(fileId: 'all-services', variable: 'CONFIG_FILE')]) {
                     sh '''
-                        . $CONFIG_FILE
+                        # 환경 변수 로드
+                        set -a
+                        source "$CONFIG_FILE"
+                        set +a
+
                         ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
+                        echo "=== 빌드 및 배포 정보 ==="
+                        echo "전략: ${DEPLOYMENT_STRATEGY}"
+                        echo "이미지 태그: ${IMAGE_TAG}"
+                        echo "ECR 레지스트리: $ECR_REGISTRY"
+                        echo "Kafka 엔드포인트: $KAFKA_BOOTSTRAP_SERVERS"
+
+                        # 1. 서비스 빌드
+                        echo "=== 서비스 빌드 ==="
                         chmod +x ./gradlew
                         ./gradlew clean --no-daemon
 
@@ -185,19 +197,34 @@ EOF
                             docker push ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:canary
                             docker push ${ECR_REGISTRY}/${ECR_PREFIX}/user-service:canary
                         fi
-                    '''
-                }
-            }
-        }
 
-        stage('Deploy Services') {
-            steps {
-                configFileProvider([configFile(fileId: 'all-services', variable: 'CONFIG_FILE')]) {
-                    sh '''
-                        . $CONFIG_FILE
-                        ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+                        # 2. ConfigMap 및 Secret 생성/업데이트
+                        echo "=== ConfigMap 및 Secret 업데이트 ==="
 
-                        # 환경변수 치환 함수
+                        # Kafka ConfigMap 생성
+                        kubectl create configmap kafka-config \\
+                            --from-literal=KAFKA_BOOTSTRAP_SERVERS="$KAFKA_BOOTSTRAP_SERVERS" \\
+                            --from-literal=SPRING_KAFKA_BOOTSTRAP_SERVERS="$KAFKA_BOOTSTRAP_SERVERS" \\
+                            -n app --dry-run=client -o yaml | kubectl apply -f -
+
+                        # 애플리케이션 전체 설정 Secret 생성
+                        kubectl create secret generic app-config \\
+                            --from-literal=AWS_REGION="$AWS_REGION" \\
+                            --from-literal=DB_URL="$DB_URL" \\
+                            --from-literal=DB_USERNAME="$DB_USERNAME" \\
+                            --from-literal=DB_PASSWORD="$DB_PASSWORD" \\
+                            --from-literal=REDIS_HOST="$REDIS_HOST" \\
+                            --from-literal=REDIS_PORT="$REDIS_PORT" \\
+                            --from-literal=KAFKA_BOOTSTRAP_SERVERS="$KAFKA_BOOTSTRAP_SERVERS" \\
+                            --from-literal=JWT_SECRET="$JWT_SECRET" \\
+                            --from-literal=JWT_REFRESH_SECRET="$JWT_REFRESH_SECRET" \\
+                            --from-literal=MAIL_USERNAME="$MAIL_USERNAME" \\
+                            --from-literal=MAIL_PASSWORD="$MAIL_PASSWORD" \\
+                            --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \\
+                            --from-literal=GOOGLE_CLIENT_SECRET_ID="$GOOGLE_CLIENT_SECRET_ID" \\
+                            -n app --dry-run=client -o yaml | kubectl apply -f -
+
+                        # 3. 템플릿 치환 함수
                         substitute_vars() {
                             local input_file="$1"
                             local output_file="$2"
@@ -210,85 +237,45 @@ EOF
                             sed -e "s|\\${ECR_REGISTRY}|$ECR_REGISTRY|g" \\
                                 -e "s|\\${ECR_PREFIX}|$ECR_PREFIX|g" \\
                                 -e "s|\\${IMAGE_TAG}|$ACTUAL_IMAGE_TAG|g" \\
+                                -e "s|\\${KAFKA_BOOTSTRAP_SERVERS}|$KAFKA_BOOTSTRAP_SERVERS|g" \\
+                                -e "s|\\${DB_URL}|$DB_URL|g" \\
+                                -e "s|\\${DB_USERNAME}|$DB_USERNAME|g" \\
+                                -e "s|\\${DB_PASSWORD}|$DB_PASSWORD|g" \\
+                                -e "s|\\${REDIS_HOST}|$REDIS_HOST|g" \\
+                                -e "s|\\${REDIS_PORT}|$REDIS_PORT|g" \\
+                                -e "s|\\${JWT_SECRET}|$JWT_SECRET|g" \\
+                                -e "s|\\${JWT_REFRESH_SECRET}|$JWT_REFRESH_SECRET|g" \\
                                 "$input_file" > "$output_file"
                         }
 
+                        # 4. 배포 전략에 따른 배포
                         case "${DEPLOYMENT_STRATEGY}" in
                             canary)
-                                echo "=== 카나리 배포 (ALB 최적화) ==="
+                                echo "=== 카나리 배포 ==="
                                 cd aws/canary-deployment/services
 
-                                # 현재 디렉토리 및 파일 구조 확인
-                                echo "현재 작업 디렉토리: $(pwd)"
-                                echo "파일 구조 확인:"
-                                ls -la ../../eks-app/services/ || echo "../../eks-app/services/ 경로 확인 실패"
-                                find ../../.. -name "*service*.yaml" -path "*/eks-app/services/*" || echo "eks-app 서비스 파일 검색 실패"
+                                # Services 배포
+                                echo "Services 배포..."
+                                /usr/local/bin/kubectl apply -f ../../eks-app/services/auth-service.yaml -n app
+                                /usr/local/bin/kubectl apply -f ../../eks-app/services/user-service.yaml -n app
 
-                                # 1. Services 먼저 배포 (ALB 대상그룹 생성)
-                                echo "1. Services 배포..."
-
-                                # 절대 경로로 수정하여 확실히 찾을 수 있도록 함
-                                if [ -f "../../eks-app/services/auth-service.yaml" ]; then
-                                    echo "eks-app의 auth-service.yaml 사용"
-                                    /usr/local/bin/kubectl apply -f ../../eks-app/services/auth-service.yaml -n app
-                                    echo "Auth Service (stable/canary) 배포 완료"
+                                # 기존 Ingress 확인 (새로 배포하지 않고 참조만)
+                                echo "기존 Ingress 확인..."
+                                if ! kubectl get ingress app-ingress -n app &>/dev/null; then
+                                    echo "Ingress가 없으므로 새로 생성합니다."
+                                    /usr/local/bin/kubectl apply -f ../../eks-app/ingress/app-ingress.yaml -n app
+                                    sleep 30  # ALB 생성 대기
                                 else
-                                    echo "../../eks-app/services/auth-service.yaml 파일을 찾을 수 없습니다."
-                                    echo "현재 위치에서 auth-service 파일 검색:"
-                                    find . -name "*auth*service*.yaml" -type f
-                                    echo "루트에서 auth-service 파일 검색:"
-                                    find ../../.. -name "auth-service.yaml" -type f
-
-                                    # 대체 경로 시도
-                                    if [ -f "auth-service/auth-service-services.yaml" ]; then
-                                        echo "대체 파일 사용: auth-service/auth-service-services.yaml"
-                                        /usr/local/bin/kubectl apply -f auth-service/auth-service-services.yaml -n app
-                                    else
-                                        echo "ERROR: auth-service 파일을 찾을 수 없습니다"
-                                        exit 1
-                                    fi
+                                    echo "기존 Ingress를 사용합니다."
                                 fi
 
-                                if [ -f "../../eks-app/services/user-service.yaml" ]; then
-                                    echo "eks-app의 user-service.yaml 사용"
-                                    /usr/local/bin/kubectl apply -f ../../eks-app/services/user-service.yaml -n app
-                                    echo "User Service (stable/canary) 배포 완료"
-                                else
-                                    echo "../../eks-app/services/user-service.yaml 파일을 찾을 수 없습니다."
-                                    echo "현재 위치에서 user-service 파일 검색:"
-                                    find . -name "*user*service*.yaml" -type f
-                                    echo "루트에서 user-service 파일 검색:"
-                                    find ../../.. -name "user-service.yaml" -type f
+                                # Analysis Templates 배포
+                                echo "Analysis Templates 배포..."
+                                [ -f "auth-service/auth-service-analysis.yaml" ] && /usr/local/bin/kubectl apply -f auth-service/auth-service-analysis.yaml -n app
+                                [ -f "user-service/user-service-analysis.yaml" ] && /usr/local/bin/kubectl apply -f user-service/user-service-analysis.yaml -n app
 
-                                    # 대체 경로 시도
-                                    if [ -f "user-service/user-service-services.yaml" ]; then
-                                        echo "대체 파일 사용: user-service/user-service-services.yaml"
-                                        /usr/local/bin/kubectl apply -f user-service/user-service-services.yaml -n app
-                                    else
-                                        echo "ERROR: user-service 파일을 찾을 수 없습니다"
-                                        exit 1
-                                    fi
-                                fi
-
-                                # 2. ALB 대기
-                                echo "2. ALB Controller 대기 (30초)..."
-                                sleep 30
-
-                                # 3. Ingress 배포
-                                echo "3. Ingress 배포..."
-                                /usr/local/bin/kubectl apply -f ../../eks-app/ingress/app-ingress.yaml -n app
-
-                                # 4. Analysis Templates 배포
-                                echo "4. Analysis Templates 배포..."
-                                if [ -f "auth-service/auth-service-analysis.yaml" ]; then
-                                    /usr/local/bin/kubectl apply -f auth-service/auth-service-analysis.yaml -n app
-                                fi
-                                if [ -f "user-service/user-service-analysis.yaml" ]; then
-                                    /usr/local/bin/kubectl apply -f user-service/user-service-analysis.yaml -n app
-                                fi
-
-                                # 5. Rollout 배포
-                                echo "5. Rollout 배포..."
+                                # Rollout 배포
+                                echo "Rollout 배포..."
                                 mkdir -p /tmp/k8s
                                 substitute_vars auth-service/auth-service-rollout.yaml /tmp/k8s/auth-rollout.yaml
                                 substitute_vars user-service/user-service-rollout.yaml /tmp/k8s/user-rollout.yaml
@@ -302,11 +289,20 @@ EOF
                                 echo "=== 일반 배포 ==="
                                 cd aws/canary-deployment/services
 
+                                # Services 배포
                                 /usr/local/bin/kubectl apply -f ../../eks-app/services/auth-service.yaml -n app
                                 /usr/local/bin/kubectl apply -f ../../eks-app/services/user-service.yaml -n app
-                                sleep 20
-                                /usr/local/bin/kubectl apply -f ../../eks-app/ingress/app-ingress.yaml -n app
 
+                                # 기존 Ingress 확인
+                                if ! kubectl get ingress app-ingress -n app &>/dev/null; then
+                                    echo "Ingress가 없으므로 새로 생성합니다."
+                                    /usr/local/bin/kubectl apply -f ../../eks-app/ingress/app-ingress.yaml -n app
+                                    sleep 20
+                                else
+                                    echo "기존 Ingress를 사용합니다."
+                                fi
+
+                                # Rollout 배포
                                 mkdir -p /tmp/k8s
                                 substitute_vars auth-service/auth-service-rollout.yaml /tmp/k8s/auth-rollout.yaml
                                 substitute_vars user-service/user-service-rollout.yaml /tmp/k8s/user-rollout.yaml
@@ -315,33 +311,13 @@ EOF
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/user-rollout.yaml -n app
                                 ;;
                         esac
-                    '''
+
+                        # 5. 배포 상태 확인
+                        echo "=== 배포 상태 확인 ==="
+                        kubectl get pods -n app | grep -E "(auth-service|user-service)"
+                        kubectl get rollouts -n app || echo "Argo Rollouts이 설치되지 않았을 수 있습니다."
+                        '''
                 }
-            }
-        }
-
-        stage('Verify Deployment') {
-            steps {
-                sh '''
-                    echo "=== 배포 검증 ==="
-                    echo "배포 전략: ${DEPLOYMENT_STRATEGY}"
-
-                    echo "Services:"
-                    /usr/local/bin/kubectl get svc -n app | grep -E "(auth|user)" || true
-
-                    echo "Endpoints:"
-                    /usr/local/bin/kubectl get endpoints -n app | grep -E "(auth|user)" || true
-
-                    echo "Pods:"
-                    /usr/local/bin/kubectl get pods -n app || true
-
-                    if [ "${DEPLOYMENT_STRATEGY}" = "canary" ]; then
-                        echo "Rollouts:"
-                        /usr/local/bin/kubectl get rollouts -n app || true
-                        echo "Analysis Templates:"
-                        /usr/local/bin/kubectl get analysistemplates -n app || true
-                    fi
-                '''
             }
         }
     }
