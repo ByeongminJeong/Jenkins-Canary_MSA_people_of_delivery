@@ -63,38 +63,23 @@ spec:
         alb:
           ingress: app-ingress
           servicePort: 80
-          # ALB 가중치 라우팅 설정
-          rootService: auth-service-stable
-          # 트래픽 분배 모니터링을 위한 추가 설정
 
-      # 롤백 설정 강화
+      # 롤백 설정 (지원되는 필드만 사용)
       abortScaleDownDelaySeconds: 30
       scaleDownDelaySeconds: 30
-      progressDeadlineSeconds: 600
-
-      # Analysis 실패시 자동 롤백
-      analysis:
-        templates:
-        - templateName: auth-service-success-rate
-        args:
-        - name: service-name
-          value: auth-service
-        # 분석 실패시 즉시 롤백
-        successfulRunHistoryLimit: 5
-        unsuccessfulRunHistoryLimit: 5
 
   revisionHistoryLimit: 10
 
   selector:
     matchLabels:
       app: auth
-      service: auth-service  # eks-app deployment와 일치하도록 복원
+      service: auth-service
 
   template:
     metadata:
       labels:
         app: auth
-        service: auth-service  # eks-app deployment와 일치하도록 복원
+        service: auth-service
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8015"
@@ -102,94 +87,110 @@ spec:
     spec:
       nodeSelector:
         eks.amazonaws.com/nodegroup: app-ng
+        workload: app
       tolerations:
         - key: "app"
           operator: "Equal"
           value: "true"
           effect: "NoSchedule"
-
-      terminationGracePeriodSeconds: 30
-
       containers:
-        - name: auth-service
+        - name: auth-container
           image: ${ECR_REGISTRY}/${ECR_PREFIX}/auth-service:${IMAGE_TAG}
           ports:
-            - containerPort: 8015  # Pod 포트는 8015 유지
+            - containerPort: 8015
               name: http
               protocol: TCP
-
-          # ConfigMap과 Secret에서 환경변수 로드
-          envFrom:
-            - configMapRef:
-                name: app-config
-                optional: true
-            - secretRef:
-                name: app-secrets
-                optional: true
-
           env:
             - name: SPRING_PROFILES_ACTIVE
-              value: "prod"
-            - name: SERVER_PORT
-              value: "8015"
-            - name: MANAGEMENT_SERVER_PORT
-              value: "8015"
-
-          # 헬스체크 설정
-          startupProbe:
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SPRING_PROFILES_ACTIVE
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SPRING_DATASOURCE_URL
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: SPRING_DATASOURCE_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: SPRING_DATASOURCE_PASSWORD
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REDIS_PORT
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: JWT_SECRET
+            - name: JWT_REFRESH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: JWT_REFRESH_SECRET
+            - name: PASSPORT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: PASSPORT_SECRET
+            - name: SPRING_MAIL_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SPRING_MAIL_USERNAME
+            - name: SPRING_MAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: SPRING_MAIL_PASSWORD
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: GOOGLE_CLIENT_ID
+            - name: GOOGLE_CLIENT_SECRET_ID
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: GOOGLE_CLIENT_SECRET_ID
+            - name: DOMAIN
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DOMAIN
+          livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8015
-              scheme: HTTP
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            failureThreshold: 20
-            timeoutSeconds: 5
-
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /actuator/health/readiness
+              path: /actuator/health
               port: 8015
-              scheme: HTTP
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            failureThreshold: 3
-            timeoutSeconds: 3
-
-          livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
-              port: 8015
-              scheme: HTTP
-            initialDelaySeconds: 60
-            periodSeconds: 30
-            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
             timeoutSeconds: 5
-
+            failureThreshold: 3
           resources:
             requests:
-              cpu: "200m"
               memory: "512Mi"
+              cpu: "250m"
             limits:
-              cpu: "1000m"
               memory: "1Gi"
-
-          securityContext:
-            allowPrivilegeEscalation: false
-            runAsNonRoot: false
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: false
-
-          volumeMounts:
-            - name: tmp-volume
-              mountPath: /tmp
-            - name: logs-volume
-              mountPath: /app/logs
-
-      volumes:
-        - name: tmp-volume
-          emptyDir: {}
-        - name: logs-volume
-          emptyDir: {}
+              cpu: "500m"
