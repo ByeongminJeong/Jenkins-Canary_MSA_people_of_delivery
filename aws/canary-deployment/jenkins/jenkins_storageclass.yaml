@@ -1,8 +1,10 @@
-kind: StorageClass
 apiVersion: storage.k8s.io/v1
+kind: StorageClass
 metadata:
   name: jenkins-storage
 provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
 parameters:
   type: gp3
   fsType: ext4
@@ -10,5 +12,8 @@ parameters:
   throughput: "125"
   encrypted: "true"
 reclaimPolicy: Retain
-allowVolumeExpansion: true
-volumeBindingMode: Immediate
+allowedTopologies:
+- matchLabelExpressions:
+  - key: topology.kubernetes.io/zone
+    values:
+    - ap-northeast-2a
