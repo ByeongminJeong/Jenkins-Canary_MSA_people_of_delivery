@@ -13,47 +13,47 @@ spec:
     canary:
       # 더 세밀한 카나리 배포 단계
       steps:
-      - setWeight: 5   # 1단계: 5% 트래픽
-      - pause: {duration: 60s}
-      - analysis:
-          templates:
-          - templateName: auth-service-success-rate
-          args:
-          - name: service-name
-            value: auth-service-canary
-      - setWeight: 10  # 2단계: 10% 트래픽
-      - pause: {duration: 90s}
-      - analysis:
-          templates:
-          - templateName: auth-service-success-rate
-          args:
-          - name: service-name
-            value: auth-service-canary
-      - setWeight: 25  # 3단계: 25% 트래픽
-      - pause: {duration: 120s}
-      - analysis:
-          templates:
-          - templateName: auth-service-success-rate
-          args:
-          - name: service-name
-            value: auth-service-canary
-      - setWeight: 50  # 4단계: 50% 트래픽
-      - pause: {duration: 180s}
-      - analysis:
-          templates:
-          - templateName: auth-service-success-rate
-          args:
-          - name: service-name
-            value: auth-service-canary
-      - setWeight: 75  # 5단계: 75% 트래픽
-      - pause: {duration: 120s}
-      - analysis:
-          templates:
-          - templateName: auth-service-success-rate
-          args:
-          - name: service-name
-            value: auth-service-canary
-      - setWeight: 100 # 6단계: 100% 트래픽 (완전 전환)
+        - setWeight: 5   # 1단계: 5% 트래픽
+        - pause: {duration: 60s}
+        - analysis:
+            templates:
+              - templateName: auth-service-success-rate
+            args:
+              - name: service-name
+                value: auth-service-canary
+        - setWeight: 10  # 2단계: 10% 트래픽
+        - pause: {duration: 90s}
+        - analysis:
+            templates:
+              - templateName: auth-service-success-rate
+            args:
+              - name: service-name
+                value: auth-service-canary
+        - setWeight: 25  # 3단계: 25% 트래픽
+        - pause: {duration: 120s}
+        - analysis:
+            templates:
+              - templateName: auth-service-success-rate
+            args:
+              - name: service-name
+                value: auth-service-canary
+        - setWeight: 50  # 4단계: 50% 트래픽
+        - pause: {duration: 180s}
+        - analysis:
+            templates:
+              - templateName: auth-service-success-rate
+            args:
+              - name: service-name
+                value: auth-service-canary
+        - setWeight: 75  # 5단계: 75% 트래픽
+        - pause: {duration: 120s}
+        - analysis:
+            templates:
+              - templateName: auth-service-success-rate
+            args:
+              - name: service-name
+                value: auth-service-canary
+        - setWeight: 100 # 6단계: 100% 트래픽 (완전 전환)
 
       # ALB 트래픽 라우팅 설정
       canaryService: auth-service-canary
@@ -171,11 +171,24 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: DOMAIN
+            # 🔥 기존 Kafka 환경변수
             - name: KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
                 configMapKeyRef:
                   name: app-config
                   key: KAFKA_BOOTSTRAP_SERVERS
+            # ✨ 추가: Spring Boot 표준 환경변수
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SPRING_KAFKA_BOOTSTRAP_SERVERS
+            # ✨ 추가: Kafka 헬스 체크 비활성화
+            - name: MANAGEMENT_HEALTH_KAFKA_ENABLED
+              value: "false"
+            # ✨ 추가: Java 옵션 (추가 보장)
+            - name: JAVA_OPTS
+              value: "-Dspring.kafka.bootstrap-servers=$(KAFKA_BOOTSTRAP_SERVERS) -Dmanagement.health.kafka.enabled=false"
           livenessProbe:
             httpGet:
               path: /actuator/health

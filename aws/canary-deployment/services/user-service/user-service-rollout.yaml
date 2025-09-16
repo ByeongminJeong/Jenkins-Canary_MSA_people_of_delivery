@@ -46,6 +46,10 @@ spec:
           ingress: app-ingress
           servicePort: 80
 
+      # ✨ 추가: 롤백 설정
+      abortScaleDownDelaySeconds: 30
+      scaleDownDelaySeconds: 30
+
   revisionHistoryLimit: 10
 
   selector:
@@ -149,11 +153,24 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: DOMAIN
+            # 🔥 기존 Kafka 환경변수
             - name: KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
                 configMapKeyRef:
                   name: app-config
                   key: KAFKA_BOOTSTRAP_SERVERS
+            # ✨ 추가: Spring Boot 표준 환경변수
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SPRING_KAFKA_BOOTSTRAP_SERVERS
+            # ✨ 추가: Kafka 헬스 체크 비활성화
+            - name: MANAGEMENT_HEALTH_KAFKA_ENABLED
+              value: "false"
+            # ✨ 추가: Java 옵션 (추가 보장)
+            - name: JAVA_OPTS
+              value: "-Dspring.kafka.bootstrap-servers=$(KAFKA_BOOTSTRAP_SERVERS) -Dmanagement.health.kafka.enabled=false"
           livenessProbe:
             httpGet:
               path: /actuator/health

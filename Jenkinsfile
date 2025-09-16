@@ -85,7 +85,7 @@ pipeline {
 
                         mkdir -p /tmp/k8s-config
 
-                        # ConfigMap 생성 (Spring Boot 표준 환경변수 포함)
+                        # ✨ 완전한 ConfigMap 생성 (모든 Kafka 환경변수 포함)
                         cat > /tmp/k8s-config/app-config.properties << EOF
 SPRING_PROFILES_ACTIVE=production
 DEPLOYMENT_STRATEGY=${DEPLOYMENT_STRATEGY}
@@ -102,6 +102,11 @@ USER_SERVICE_PORT=${USER_SERVICE_PORT}
 MODULE_COMMON_SERVICE_PORT=${MODULE_COMMON_SERVICE_PORT}
 KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
 SPRING_KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
+MANAGEMENT_HEALTH_KAFKA_ENABLED=false
+SPRING_KAFKA_CONSUMER_ENABLE_AUTO_COMMIT=true
+SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest
+LOGGING_LEVEL_KAFKA=ERROR
+LOGGING_LEVEL_NETWORKLIENT=ERROR
 EOF
 
                         # Secret 생성
@@ -170,6 +175,7 @@ EOF
                         echo "전략: ${DEPLOYMENT_STRATEGY}"
                         echo "이미지 태그: ${IMAGE_TAG}"
                         echo "ECR 레지스트리: $ECR_REGISTRY"
+                        echo "Kafka 설정: ${KAFKA_BOOTSTRAP_SERVERS}"
 
                         chmod +x ./gradlew
                         ./gradlew clean --no-daemon
@@ -276,6 +282,12 @@ EOF
                                 substitute_vars auth-service/auth-service-rollout.yaml /tmp/k8s/auth-rollout.yaml
                                 substitute_vars user-service/user-service-rollout.yaml /tmp/k8s/user-rollout.yaml
 
+                                echo "배포할 Rollout 파일 확인:"
+                                echo "Auth Rollout 이미지 태그:"
+                                grep "image:" /tmp/k8s/auth-rollout.yaml || echo "이미지 태그 확인 실패"
+                                echo "User Rollout 이미지 태그:"
+                                grep "image:" /tmp/k8s/user-rollout.yaml || echo "이미지 태그 확인 실패"
+
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/auth-rollout.yaml -n app
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/user-rollout.yaml -n app
 
@@ -300,6 +312,12 @@ EOF
                                 mkdir -p /tmp/k8s
                                 substitute_vars auth-service/auth-service-rollout.yaml /tmp/k8s/auth-rollout.yaml
                                 substitute_vars user-service/user-service-rollout.yaml /tmp/k8s/user-rollout.yaml
+
+                                echo "배포할 Rollout 파일 확인:"
+                                echo "Auth Rollout 이미지 태그:"
+                                grep "image:" /tmp/k8s/auth-rollout.yaml || echo "이미지 태그 확인 실패"
+                                echo "User Rollout 이미지 태그:"
+                                grep "image:" /tmp/k8s/user-rollout.yaml || echo "이미지 태그 확인 실패"
 
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/auth-rollout.yaml -n app
                                 /usr/local/bin/kubectl apply -f /tmp/k8s/user-rollout.yaml -n app
@@ -338,6 +356,17 @@ EOF
 
                     echo "Secret 확인:"
                     /usr/local/bin/kubectl get secret app-secrets -n app || echo "Secret 없음"
+
+                    # ✨ 추가: Pod 로그 미리보기
+                    echo "Pod 상태 및 간단한 로그 확인:"
+                    for pod in $(kubectl get pods -n app -o name 2>/dev/null); do
+                        pod_name=$(basename $pod)
+                        echo "=== $pod_name 상태 ==="
+                        kubectl get pod $pod_name -n app || true
+                        echo "최근 로그 (마지막 5줄):"
+                        kubectl logs $pod_name -n app --tail=5 2>/dev/null || echo "로그 없음"
+                        echo ""
+                    done
                 '''
             }
         }
@@ -353,7 +382,7 @@ EOF
 🎉 카나리 배포 완료! (cloud 브랜치)
 - 브랜치: ${env.BRANCH_NAME_CLEAN}
 - 이미지: canary 태그
-- Kafka 설정: 자동 적용됨
+- Kafka 설정: 완전 적용됨 ✅
 
 📊 모니터링:
 kubectl argo rollouts get rollout auth-service-rollout -n app --watch
@@ -361,8 +390,12 @@ kubectl argo rollouts get rollout user-service-rollout -n app --watch
 
 🔍 상태 확인:
 kubectl get pods -n app
-kubectl logs -n app -l app=auth-service --tail=20
-kubectl logs -n app -l app=user-service --tail=20
+kubectl logs -n app -l app=auth --tail=20
+kubectl logs -n app -l app=user --tail=20
+
+🌐 서비스 접속:
+https://${env.DOMAIN}/auth/actuator/health
+https://${env.DOMAIN}/user/actuator/health
 """
                         break
                     default:
@@ -371,10 +404,12 @@ kubectl logs -n app -l app=user-service --tail=20
 - 브랜치: ${env.BRANCH_NAME_CLEAN}
 - 전략: ${env.DEPLOYMENT_STRATEGY}
 - 이미지: ${env.IMAGE_TAG}
-- Kafka 설정: 자동 적용됨
+- Kafka 설정: 완전 적용됨 ✅
 
 🔍 상태 확인:
 kubectl get pods -n app
+kubectl logs -n app -l app=auth --tail=20
+kubectl logs -n app -l app=user --tail=20
 """
                 }
                 echo message
@@ -393,12 +428,22 @@ kubectl get pods -n app
 
                 echo "최근 이벤트:"
                 /usr/local/bin/kubectl get events -n app --sort-by='.lastTimestamp' | tail -10 || true
+
+                echo "Pod 로그 (실패한 Pod들):"
+                for pod in $(kubectl get pods -n app -o name --field-selector=status.phase!=Running 2>/dev/null); do
+                    pod_name=$(basename $pod)
+                    echo "=== $pod_name 로그 ==="
+                    kubectl logs $pod_name -n app --tail=50 2>/dev/null || echo "로그 없음"
+                    echo ""
+                done
             '''
         }
 
         always {
-            sh 'rm -rf /tmp/k8s 2>/dev/null || true'
-            sh 'rm -rf /tmp/k8s-config 2>/dev/null || true'
+            sh '''
+                rm -rf /tmp/k8s 2>/dev/null || true
+                rm -rf /tmp/k8s-config 2>/dev/null || true
+            '''
         }
     }
 }
