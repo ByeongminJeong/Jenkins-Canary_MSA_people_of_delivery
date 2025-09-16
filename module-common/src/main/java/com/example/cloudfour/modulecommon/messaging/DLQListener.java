@@ -22,7 +22,7 @@ public class DLQListener {
 
     @KafkaListener(
         topics = "${kafka.topics.orderEventsDLQ:order.events.dlq.v1}",
-        groupId = "dlq-processor",
+        groupId = "${DLQ_CONSUMER_GROUP_ORDER:order-service-dlq-processor}",
         containerFactory = "dlqKafkaListenerContainerFactory"
     )
     public void handleOrderEventDLQ(
@@ -51,7 +51,7 @@ public class DLQListener {
 
     @KafkaListener(
         topics = "${kafka.topics.orderCommandsDLQ:order.commands.dlq.v1}",
-        groupId = "dlq-processor",
+        groupId = "${DLQ_CONSUMER_GROUP_ORDER:order-service-dlq-processor}",
         containerFactory = "dlqKafkaListenerContainerFactory"
     )
     public void handleOrderCommandDLQ(
@@ -80,7 +80,7 @@ public class DLQListener {
 
     @KafkaListener(
         topics = "${kafka.topics.inventoryEventsDLQ:inventory.events.dlq.v1}",
-        groupId = "dlq-processor",
+        groupId = "${DLQ_CONSUMER_GROUP_INVENTORY:inventory-service-dlq-processor}",
         containerFactory = "dlqKafkaListenerContainerFactory"
     )
     public void handleInventoryEventDLQ(
@@ -109,7 +109,7 @@ public class DLQListener {
 
     @KafkaListener(
         topics = "${kafka.topics.paymentEventsDLQ:payment.events.dlq.v1}",
-        groupId = "dlq-processor",
+        groupId = "${DLQ_CONSUMER_GROUP_PAYMENT:payment-service-dlq-processor}",
         containerFactory = "dlqKafkaListenerContainerFactory"
     )
     public void handlePaymentEventDLQ(

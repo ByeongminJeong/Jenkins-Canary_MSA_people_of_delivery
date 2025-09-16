@@ -106,17 +106,18 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: SPRING_PROFILES_ACTIVE
-            - name: SPRING_DATASOURCE_URL
+            # 🔥 기존 환경변수로 통일 (Application 설정과 일치)
+            - name: DB_URL
               valueFrom:
                 configMapKeyRef:
                   name: app-config
                   key: SPRING_DATASOURCE_URL
-            - name: SPRING_DATASOURCE_USERNAME
+            - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
                   key: SPRING_DATASOURCE_USERNAME
-            - name: SPRING_DATASOURCE_PASSWORD
+            - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -146,12 +147,12 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: PASSPORT_SECRET
-            - name: SPRING_MAIL_USERNAME
+            - name: MAIL_USERNAME
               valueFrom:
                 configMapKeyRef:
                   name: app-config
                   key: SPRING_MAIL_USERNAME
-            - name: SPRING_MAIL_PASSWORD
+            - name: MAIL_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
@@ -171,25 +172,13 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: DOMAIN
-            # 🔥 Spring Boot 표준 Kafka 환경변수
-            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: SPRING_KAFKA_BOOTSTRAP_SERVERS
-            # 기존 환경변수 (하위 호환성)
+            # 🔥 Kafka 설정 - 기존 환경변수 사용 (Application과 일치)
             - name: KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
                 configMapKeyRef:
                   name: app-config
                   key: KAFKA_BOOTSTRAP_SERVERS
-            # ✨ Kafka 헬스 체크 비활성화
-            - name: MANAGEMENT_HEALTH_KAFKA_ENABLED
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: MANAGEMENT_HEALTH_KAFKA_ENABLED
-            # ✨ Kafka Consumer 설정
+            # ✨ Kafka Consumer 설정 - 기존 환경변수로 매핑
             - name: SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET
               valueFrom:
                 configMapKeyRef:
@@ -200,9 +189,48 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: SPRING_KAFKA_CONSUMER_ENABLE_AUTO_COMMIT
-            # ✨ Java 옵션 (AWS 표준 사용)
-            - name: JAVA_OPTS
-              value: "-Dspring.kafka.bootstrap-servers=$(KAFKA_BOOTSTRAP_SERVERS) -Dmanagement.health.kafka.enabled=false"
+            # ✨ 로깅 레벨 설정
+            - name: LOGGING_LEVEL_KAFKA
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: LOGGING_LEVEL_KAFKA
+            - name: LOGGING_LEVEL_NETWORKLIENT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: LOGGING_LEVEL_NETWORKLIENT
+            # ✨ DLQ Consumer Group 설정 (각 서비스별 고유 ID)
+            - name: DLQ_CONSUMER_GROUP_AUTH
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_AUTH
+            - name: DLQ_CONSUMER_GROUP_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_USER
+            - name: DLQ_CONSUMER_GROUP_ORDER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_ORDER
+            - name: DLQ_CONSUMER_GROUP_PAYMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_PAYMENT
+            - name: DLQ_CONSUMER_GROUP_INVENTORY
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_INVENTORY
+            - name: DLQ_CONSUMER_GROUP_RESERVATION
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_RESERVATION
           livenessProbe:
             httpGet:
               path: /actuator/health

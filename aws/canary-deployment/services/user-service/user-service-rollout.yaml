@@ -182,6 +182,37 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: LOGGING_LEVEL_NETWORKLIENT
+            # ✨ DLQ Consumer Group 설정 (각 서비스별 고유 ID)
+            - name: DLQ_CONSUMER_GROUP_AUTH
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_AUTH
+            - name: DLQ_CONSUMER_GROUP_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_USER
+            - name: DLQ_CONSUMER_GROUP_ORDER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_ORDER
+            - name: DLQ_CONSUMER_GROUP_PAYMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_PAYMENT
+            - name: DLQ_CONSUMER_GROUP_INVENTORY
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_INVENTORY
+            - name: DLQ_CONSUMER_GROUP_RESERVATION
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DLQ_CONSUMER_GROUP_RESERVATION
           livenessProbe:
             httpGet:
               path: /actuator/health
@@ -205,3 +236,4 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "500m"
+
