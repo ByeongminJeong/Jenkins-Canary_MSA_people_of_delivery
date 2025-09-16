@@ -85,9 +85,9 @@ pipeline {
 
                         mkdir -p /tmp/k8s-config
 
-                        # ✨ 정리된 ConfigMap 생성 (중복 제거)
+                        # ✨ 수정된 ConfigMap 생성 (msk 프로파일 포함)
                         cat > /tmp/k8s-config/app-config.properties << EOF
-SPRING_PROFILES_ACTIVE=production
+SPRING_PROFILES_ACTIVE=production,msk
 DEPLOYMENT_STRATEGY=${DEPLOYMENT_STRATEGY}
 SPRING_DATASOURCE_URL=${DB_URL}
 SPRING_REDIS_HOST=${REDIS_HOST}
