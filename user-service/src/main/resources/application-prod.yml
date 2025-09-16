@@ -16,6 +16,8 @@ management:
       enabled: false           # DB 체크 비활성화
     redis:
       enabled: false
+    mail:
+      enabled: false
 
 logging:
   level:
