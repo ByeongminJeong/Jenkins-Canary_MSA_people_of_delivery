@@ -11,10 +11,10 @@ metadata:
 spec:
   selector:
     app: auth
-    service: auth-service
+    service: auth-service  # eks-app deployment와 일치하도록 복원
   ports:
-    - port: 80          # Ingress에서 참조하는 포트
-      targetPort: 8015  # 실제 Pod 포트
+    - port: 80
+      targetPort: 8015
       protocol: TCP
       name: http
   type: ClusterIP
@@ -33,10 +33,10 @@ metadata:
 spec:
   selector:
     app: auth
-    service: auth-service
+    service: auth-service  # eks-app deployment와 일치하도록 복원
   ports:
-    - port: 80          # Ingress에서 참조하는 포트
-      targetPort: 8015  # 실제 Pod 포트
+    - port: 80
+      targetPort: 8015
       protocol: TCP
       name: http
   type: ClusterIP
@@ -54,10 +54,10 @@ metadata:
 spec:
   selector:
     app: auth
-    service: auth-service
+    service: auth-service  # eks-app deployment와 일치하도록 복원
   ports:
-    - port: 80          # Ingress에서 참조하는 포트
-      targetPort: 8015  # 실제 Pod 포트
+    - port: 80
+      targetPort: 8015
       protocol: TCP
       name: http
   type: ClusterIP

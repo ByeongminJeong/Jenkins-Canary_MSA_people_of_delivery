@@ -11,53 +11,90 @@ spec:
 
   strategy:
     canary:
+      # 더 세밀한 카나리 배포 단계
       steps:
-        - setWeight: 10
-        - pause: {duration: 30s}
-        - analysis:
-            templates:
-              - templateName: auth-service-success-rate
-            args:
-              - name: service-name
-                value: auth-service-canary
-        - setWeight: 25
-        - pause: {duration: 60s}
-        - analysis:
-            templates:
-              - templateName: auth-service-success-rate
-            args:
-              - name: service-name
-                value: auth-service-canary
-        - setWeight: 50
-        - pause: {duration: 120s}
-        - analysis:
-            templates:
-              - templateName: auth-service-success-rate
-            args:
-              - name: service-name
-                value: auth-service-canary
-        - setWeight: 100
+      - setWeight: 5   # 1단계: 5% 트래픽
+      - pause: {duration: 60s}
+      - analysis:
+          templates:
+          - templateName: auth-service-success-rate
+          args:
+          - name: service-name
+            value: auth-service-canary
+      - setWeight: 10  # 2단계: 10% 트래픽
+      - pause: {duration: 90s}
+      - analysis:
+          templates:
+          - templateName: auth-service-success-rate
+          args:
+          - name: service-name
+            value: auth-service-canary
+      - setWeight: 25  # 3단계: 25% 트래픽
+      - pause: {duration: 120s}
+      - analysis:
+          templates:
+          - templateName: auth-service-success-rate
+          args:
+          - name: service-name
+            value: auth-service-canary
+      - setWeight: 50  # 4단계: 50% 트래픽
+      - pause: {duration: 180s}
+      - analysis:
+          templates:
+          - templateName: auth-service-success-rate
+          args:
+          - name: service-name
+            value: auth-service-canary
+      - setWeight: 75  # 5단계: 75% 트래픽
+      - pause: {duration: 120s}
+      - analysis:
+          templates:
+          - templateName: auth-service-success-rate
+          args:
+          - name: service-name
+            value: auth-service-canary
+      - setWeight: 100 # 6단계: 100% 트래픽 (완전 전환)
 
+      # ALB 트래픽 라우팅 설정
       canaryService: auth-service-canary
       stableService: auth-service-stable
 
       trafficRouting:
         alb:
           ingress: app-ingress
-          servicePort: 80  # ✅ 80으로 수정 (서비스 포트와 일치)
+          servicePort: 80
+          # ALB 가중치 라우팅 설정
+          rootService: auth-service-stable
+          # 트래픽 분배 모니터링을 위한 추가 설정
+
+      # 롤백 설정 강화
+      abortScaleDownDelaySeconds: 30
+      scaleDownDelaySeconds: 30
+      progressDeadlineSeconds: 600
+
+      # Analysis 실패시 자동 롤백
+      analysis:
+        templates:
+        - templateName: auth-service-success-rate
+        args:
+        - name: service-name
+          value: auth-service
+        # 분석 실패시 즉시 롤백
+        successfulRunHistoryLimit: 5
+        unsuccessfulRunHistoryLimit: 5
 
   revisionHistoryLimit: 10
 
   selector:
     matchLabels:
       app: auth
-      service: auth-service
+      service: auth-service  # eks-app deployment와 일치하도록 복원
 
   template:
     metadata:
       labels:
         app: auth
-        service: auth-service
+        service: auth-service  # eks-app deployment와 일치하도록 복원
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8015"
