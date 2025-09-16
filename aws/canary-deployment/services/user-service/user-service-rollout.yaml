@@ -153,7 +153,13 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: DOMAIN
-            # 🔥 Kafka 환경변수 (AWS 표준 사용)
+            # 🔥 Spring Boot 표준 Kafka 환경변수
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SPRING_KAFKA_BOOTSTRAP_SERVERS
+            # 기존 환경변수 (하위 호환성)
             - name: KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
                 configMapKeyRef:
