@@ -119,6 +119,11 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: JWT_REFRESH_SECRET
+            - name: PASSPORT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: PASSPORT_SECRET
             - name: SPRING_MAIL_USERNAME
               valueFrom:
                 configMapKeyRef:
@@ -144,6 +149,11 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: DOMAIN
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
           livenessProbe:
             httpGet:
               path: /actuator/health
