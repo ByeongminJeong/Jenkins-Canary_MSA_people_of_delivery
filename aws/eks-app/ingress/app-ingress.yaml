@@ -18,6 +18,8 @@ metadata:
     alb.ingress.kubernetes.io/group.order: '1'
     alb.ingress.kubernetes.io/load-balancer-attributes: routing.http2.enabled=true
     alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=60
+    alb.ingress.kubernetes.io/security-groups: sg-xxxxxxxxx,sg-yyyyyyyyy
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: "false"
 spec:
   ingressClassName: alb
   rules:
