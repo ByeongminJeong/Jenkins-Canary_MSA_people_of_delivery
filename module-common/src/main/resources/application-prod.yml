@@ -1,0 +1,71 @@
+# Production 환경 기본 설정 (module-common)
+server:
+  port: ${MODULE_COMMON_SERVICE_PORT:8011}
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+  health:
+    db:
+      enabled: false
+    redis:
+      enabled: false
+    kafka:
+      enabled: ${MANAGEMENT_HEALTH_KAFKA_ENABLED:false}
+
+spring:
+  application:
+    name: module-common
+
+  jpa:
+    hibernate.ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        highlight_sql: true
+
+  batch:
+    job:
+      enabled: false
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:${DB_URL}}
+    driver-class-name: org.postgresql.Driver
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD}}
+
+  cloud:
+    config:
+      enabled: false
+
+# 로깅 설정
+logging:
+  level:
+    org.apache.kafka: ${LOGGING_LEVEL_KAFKA:ERROR}
+    org.springframework.kafka: ${LOGGING_LEVEL_KAFKA:ERROR}
+    org.springframework.web.client: ${LOGGING_LEVEL_NETWORKLIENT:ERROR}
+    root: WARN
+
+# 앱 전용 토픽 이름 (기존 유지)
+kafka:
+  topics:
+    orderEvents: order.events.v1
+    orderCommands: order.commands.v1
+    inventoryEvents: inventory.events.v1
+    inventoryCommands: inventory.commands.v1
+    paymentEvents: payment.events.v1
+    paymentCommands: payment.commands.v1
+
+    orderEventsDLQ: order.events.dlq.v1
+    orderCommandsDLQ: order.commands.dlq.v1
+    inventoryEventsDLQ: inventory.events.dlq.v1
+    inventoryCommandsDLQ: inventory.commands.dlq.v1
+    paymentEventsDLQ: payment.events.dlq.v1
+    paymentCommandsDLQ: payment.commands.dlq.v1
