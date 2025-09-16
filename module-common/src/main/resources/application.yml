@@ -15,7 +15,8 @@ management:
       enabled: false           # DB 체크 비활성화
     redis:
       enabled: false
-
+    mail:
+      enabled: false           # Mail 체크 비활성화 추가
 
 spring:
   application:
@@ -29,18 +30,16 @@ spring:
         format_sql: true
         highlight_sql: true
 
-
-  spring:
-    batch:
-      job:
-        enabled: false
-
+  batch:
+    job:
+      enabled: false
 
   datasource:
     url: ${DB_URL}
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
   cloud:
     config:
       enabled: false
